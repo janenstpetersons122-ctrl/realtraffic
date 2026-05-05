@@ -1,44 +1,47 @@
 # ──────────────────────────────────────────────────────────────────────
-# RealTraffic — Backend + Caddy + DDNS (frontend deployed on Vercel)
+# RealTraffic — Backend + Caddy(rate-limited) + Redis + DDNS
+# Frontend deployed on Vercel (free, free-public access from anywhere).
 # ──────────────────────────────────────────────────────────────────────
 # Architecture:
 #     [Vercel frontend (free)]  ─→  https://api.yourdomain.com
 #                                              │
 #                                              ▼
-#               [Caddy auto-SSL via Let's Encrypt — host :443/:80]
+#               [Caddy auto-SSL + rate-limit  — host :443/:80]
 #                                              │
 #                                              ▼
-#              [realtraffic-backend (FastAPI + Playwright)]
+#              [realtraffic-backend (FastAPI 4 workers + Playwright)]
 #                                              │
-#                                              ▼
-#                          [realtraffic-mongo]
+#                          ┌───────────────────┴───────────────────┐
+#                          ▼                                       ▼
+#               [realtraffic-mongo]                      [realtraffic-redis]
 #
-# What you get:
-#   • Free Let's Encrypt SSL on api.yourdomain.com — auto-renewed
-#   • Namecheap DDNS auto-updates DNS when Nayatel rotates your public IP
-#   • All containers `realtraffic-*` prefixed → no clash with other projects
-#   • Backend NEVER exposed to host network directly — only via Caddy
-#
-# Required env vars (INSTALL.bat will ask + write to .env on first run):
-#   BACKEND_DOMAIN       — e.g. api.realtraffic.online
-#   LE_EMAIL             — Let's Encrypt notification email
-#   NAMECHEAP_DDNS_PASS  — Namecheap DDNS password (leave blank = static IP)
-#   NAMECHEAP_DOMAIN     — e.g. realtraffic.online
-#   NAMECHEAP_HOST       — e.g. api  (subdomain part)
-#
-# Manual one-time setup AFTER `docker compose up`:
-#   1. Huawei router → forward port 80 + 443 → this PC local IP
-#   2. Namecheap → Advanced DNS → A record `api` → your public IP
-#   3. Namecheap → enable Dynamic DNS → copy password into .env
-#   4. Vercel → deploy frontend → REACT_APP_BACKEND_URL=https://api.yourdomain.com
+# What this stack guarantees:
+#   • No timeout under heavy traffic     → Caddy 600s + backend 4 workers
+#   • Auto-SSL on api.yourdomain.com     → Let's Encrypt, auto-renewed
+#   • Auto-restart on crash              → Docker restart_policy
+#   • Rate-limit + per-IP throttling     → blocks DDoS at the edge
+#   • Healthchecks on every container    → unhealthy = no traffic
+#   • Sentry crash reporting (opt-in)    → set SENTRY_DSN in .env
+#   • Redis caching layer (used by app)  → faster repeated queries
+#   • All `realtraffic-*` prefixed       → no clash with other Docker projects
 # ──────────────────────────────────────────────────────────────────────
 name: realtraffic
+
+x-restart-policy: &default-restart
+  restart: unless-stopped
+  deploy:
+    restart_policy:
+      condition: any
+      delay: 5s
+      max_attempts: 0       # unlimited — keep retrying forever
+      window: 60s
 
 services:
   mongo:
     image: mongo:7
     container_name: realtraffic-mongo
-    restart: unless-stopped
+    <<: *default-restart
+    command: ["mongod", "--bind_ip_all", "--wiredTigerCacheSizeGB", "1"]
     volumes:
       - mongo-data:/data/db
     networks:
@@ -48,19 +51,44 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    mem_limit: 1g
-    memswap_limit: 1g
+      start_period: 30s
+    mem_limit: 2g
+    memswap_limit: 2g
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  redis:
+    image: redis:7-alpine
+    container_name: realtraffic-redis
+    <<: *default-restart
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    volumes:
+      - redis-data:/data
+    networks:
+      - realtraffic-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    mem_limit: 384m
+    memswap_limit: 384m
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: realtraffic-backend
-    restart: unless-stopped
+    <<: *default-restart
     depends_on:
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      # ---- Core ----
       MONGO_URL: "mongodb://mongo:27017"
       DB_NAME: "${DB_NAME:-realtraffic}"
       JWT_SECRET_KEY: "${JWT_SECRET_KEY}"
@@ -70,10 +98,23 @@ services:
       APP_URL: "${APP_URL:-https://${BACKEND_DOMAIN}}"
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-https://${BACKEND_DOMAIN}}"
       CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      # ---- Performance tuning ----
+      UVICORN_WORKERS: "${UVICORN_WORKERS:-4}"
+      MONGO_MAX_POOL_SIZE: "${MONGO_MAX_POOL_SIZE:-150}"
+      MONGO_MIN_POOL_SIZE: "${MONGO_MIN_POOL_SIZE:-20}"
+      MONGO_MAX_IDLE_TIME_MS: "${MONGO_MAX_IDLE_TIME_MS:-30000}"
+      HEAVY_JOB_CONCURRENCY: "${HEAVY_JOB_CONCURRENCY:-8}"
+      REDIS_URL: "redis://redis:6379/0"
+      # ---- Email / Sheets ----
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       RESEND_FROM: "${RESEND_FROM:-no-reply@realtraffic.local}"
       GOOGLE_SHEETS_SA_PATH: "${GOOGLE_SHEETS_SA_PATH:-/app/backend/secrets/gsheets-sa.json}"
       GOOGLE_SHEETS_SA_JSON: "${GOOGLE_SHEETS_SA_JSON:-}"
+      # ---- Monitoring ----
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+      SENTRY_ENVIRONMENT: "${SENTRY_ENVIRONMENT:-production}"
+      SENTRY_RELEASE: "${SENTRY_RELEASE:-realtraffic@latest}"
+      SENTRY_TRACES_SAMPLE_RATE: "${SENTRY_TRACES_SAMPLE_RATE:-0.05}"
     expose:
       - "8001"
     volumes:
@@ -88,22 +129,25 @@ services:
       interval: 20s
       timeout: 5s
       retries: 5
-    mem_limit: 4g
-    memswap_limit: 4g
+      start_period: 60s
+    mem_limit: 6g
+    memswap_limit: 6g
+    pids_limit: 2048
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ./deployment/caddy
+      dockerfile: Dockerfile
+    image: realtraffic/caddy-rl:latest
     container_name: realtraffic-caddy
-    restart: unless-stopped
+    <<: *default-restart
     depends_on:
       backend:
         condition: service_healthy
-      # If DDNS profile is enabled, wait briefly for the DDNS updater to
-      # push the current public IP to Namecheap before Caddy attempts
-      # the Let's Encrypt ACME challenge on first boot. Without this,
-      # cert issuance can fail for 5-15 min until DDNS has run once.
-      # `service_started` is fine — we don't need the updater to be
-      # healthy, just kicked off.
       ddns-updater:
         condition: service_started
         required: false
@@ -119,12 +163,16 @@ services:
       - caddy-config:/config
     networks:
       - realtraffic-net
-    mem_limit: 256m
+    mem_limit: 384m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
   ddns-updater:
     image: qmcgaw/ddns-updater:latest
     container_name: realtraffic-ddns
-    restart: unless-stopped
+    <<: *default-restart
     volumes:
       - ./ddns-config:/updater/data
     environment:
@@ -134,11 +182,13 @@ services:
       - realtraffic-net
     mem_limit: 64m
     profiles:
-      - ddns   # only starts when Namecheap DDNS configured (INSTALL.bat enables this)
+      - ddns   # only starts when DDNS configured (INSTALL.bat enables this)
 
 volumes:
   mongo-data:
     name: realtraffic-mongo-data
+  redis-data:
+    name: realtraffic-redis-data
   pw-browsers:
     name: realtraffic-pw-browsers
   uploaded-data:

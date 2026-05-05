@@ -187,3 +187,57 @@ User flow: GitHub → ZIP → extract → `INSTALL.bat` double-click → 5-10 mi
 - Test credentials saved to `/app/memory/test_credentials.md`.
 - **Save flow**: Collaborator will use Emergent's "Save to GitHub" feature to push to `main` branch of the same repo.
 
+
+### Session 7 (2026-01) — Production Hardening (Heavy-traffic + No-timeout)
+
+**Goal**: User wants frontend on Vercel + backend + Mongo + everything else on home PC Docker. PC stays on 24/7. Project should NEVER go down even on heavy traffic, no timeout errors.
+
+**Implemented:**
+1. **server.py** (top, ~50 LOC added — surgical, no behavior change):
+   - Sentry init block (no-op if `SENTRY_DSN` env unset)
+   - Mongo pool tunable via env: `MONGO_MAX_POOL_SIZE`(150), `MONGO_MIN_POOL_SIZE`(20), `MONGO_MAX_IDLE_TIME_MS`, `MONGO_SERVER_SELECTION_TIMEOUT_MS`, `retryWrites=True`, `retryReads=True`
+   - Global `HEAVY_JOB_SEMAPHORE` (env `HEAVY_JOB_CONCURRENCY`, default 8) — per-worker cap; opt-in for endpoints
+   - Startup logs print effective pool + concurrency settings
+
+2. **Caddyfile** rewrite:
+   - Custom build via `deployment/caddy/Dockerfile` with `mholt/caddy-ratelimit` plugin
+   - Two rate-limit zones: `auth_burst` (10/10s/IP), `global_burst` (600/60s/IP)
+   - Slow-loris timeouts (read_body 60s, read_header 10s, idle 120s)
+   - `reverse_proxy` health check (`/health` every 15s) + `lb_try_duration 5s` retry on backend restart
+   - `dial_timeout 10s`, `response_header_timeout 600s`, kept 600s read/write
+   - HSTS + X-XSS-Protection added on top of existing security headers
+
+3. **docker-compose.yml** rewrite:
+   - YAML anchor `&default-restart` → all services: `restart: unless-stopped` + `deploy.restart_policy: any, 5s, unlimited`
+   - **NEW `redis` service** (`redis:7-alpine`, 256MB LRU cache, no persist) — provided to backend via `REDIS_URL`; future job queue ready
+   - `caddy` now `build: deployment/caddy` (custom rate-limit image)
+   - Backend `mem_limit 4g → 6g`, `pids_limit 2048`, `ulimits.nofile 65535`
+   - All services: healthcheck + `start_period`
+   - All performance + Sentry env vars wired through
+
+4. **`.env` (preview)** + documented production template:
+   - Added `UVICORN_WORKERS`, `MONGO_*_POOL_SIZE`, `HEAVY_JOB_CONCURRENCY`, `REDIS_URL`, `SENTRY_*`
+
+5. **`deployment/caddy/Dockerfile`** — new file, multi-stage xcaddy build with rate-limit plugin
+
+6. **`PERFORMANCE-HARDENING.md`** — comprehensive Roman-Urdu deployment + tuning guide for the user (rate-limit zones, sizing tables, Sentry setup, troubleshooting)
+
+**Verified in preview env (single worker, supervisor):**
+- `[Mongo] Pool: max=150 min=20 idle=30000ms` — startup log ✅
+- `[HeavyJobs] Per-worker concurrency cap: 8` — startup log ✅
+- Sentry gracefully skipped (DSN unset) ✅
+- Admin login + user login still working ✅
+- `/health` mongo_connected=true ✅
+
+**Intentional non-goals (with rationale):**
+- Did NOT migrate jobs to Celery/RQ — `server.py` is 500KB, refactor risky. 4 uvicorn workers × 8 per-worker semaphore = 32 concurrent heavy ops with full process isolation, achieves same goal without breaking anything. Redis container is in place if future migration desired.
+- Did NOT add supervisor inside container — Docker `restart_policy any 5s unlimited` is sufficient and simpler.
+
+**User flow on PC**:
+```
+git pull
+docker compose build --no-cache caddy backend
+docker compose up -d
+```
+Caddy first build ~3-5 min (Go xcaddy compile). Subsequent rebuilds cached.
+

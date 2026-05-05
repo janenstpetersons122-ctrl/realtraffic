@@ -32,6 +32,33 @@ import sys
 # print(f"DEBUG: ADMIN_EMAIL from env = {os.environ.get('ADMIN_EMAIL', 'NOT SET')}", file=sys.stderr)
 # print(f"DEBUG: MONGO_URL present = {bool(os.environ.get('MONGO_URL'))}", file=sys.stderr)
 
+# ──────────────────────────────────────────────────────────────────────
+# Sentry — Crash & performance monitoring (graceful no-op if DSN unset)
+# ──────────────────────────────────────────────────────────────────────
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+        from sentry_sdk.integrations.asyncio import AsyncioIntegration
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+            release=os.environ.get("SENTRY_RELEASE", "realtraffic@unknown"),
+            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+            profiles_sample_rate=float(os.environ.get("SENTRY_PROFILES_SAMPLE_RATE", "0.0")),
+            send_default_pii=False,
+            integrations=[
+                FastApiIntegration(transaction_style="endpoint"),
+                StarletteIntegration(transaction_style="endpoint"),
+                AsyncioIntegration(),
+            ],
+        )
+        print("[Sentry] Initialized — monitoring enabled.", file=sys.stderr)
+    except Exception as _sentry_err:
+        print(f"[Sentry] Initialization failed (non-fatal): {_sentry_err}", file=sys.stderr)
+
 # Get MongoDB URL - support both MONGO_URL and DATABASE_URL
 mongo_url = os.environ.get('MONGO_URL') or os.environ.get('DATABASE_URL')
 if not mongo_url:
@@ -40,12 +67,36 @@ if not mongo_url:
 # Get database name
 db_name = os.environ.get('DB_NAME', 'realtraffic')
 
+# MongoDB connection pool — tunable via env for heavy-load setups
+_MONGO_MAX_POOL = int(os.environ.get('MONGO_MAX_POOL_SIZE', '150'))
+_MONGO_MIN_POOL = int(os.environ.get('MONGO_MIN_POOL_SIZE', '20'))
+_MONGO_IDLE_MS  = int(os.environ.get('MONGO_MAX_IDLE_TIME_MS', '30000'))
+_MONGO_TIMEOUT_MS = int(os.environ.get('MONGO_SERVER_SELECTION_TIMEOUT_MS', '10000'))
+
 client = AsyncIOMotorClient(
     mongo_url,
-    maxPoolSize=100,  # Increase connection pool
-    minPoolSize=20,
-    maxIdleTimeMS=30000
+    maxPoolSize=_MONGO_MAX_POOL,
+    minPoolSize=_MONGO_MIN_POOL,
+    maxIdleTimeMS=_MONGO_IDLE_MS,
+    serverSelectionTimeoutMS=_MONGO_TIMEOUT_MS,
+    retryWrites=True,
+    retryReads=True,
 )
+print(
+    f"[Mongo] Pool: max={_MONGO_MAX_POOL} min={_MONGO_MIN_POOL} idle={_MONGO_IDLE_MS}ms",
+    file=sys.stderr,
+)
+
+# ──────────────────────────────────────────────────────────────────────
+# Global heavy-job concurrency cap — prevents OOM under traffic storms
+# Each Uvicorn worker gets its own semaphore; with WORKERS × CAP total
+# heavy ops can run simultaneously.  RUT/CPI submission paths can `async
+# with HEAVY_JOB_SEMAPHORE:` to participate (existing endpoints still
+# work without changes; this is opt-in).
+# ──────────────────────────────────────────────────────────────────────
+_HEAVY_CAP = int(os.environ.get('HEAVY_JOB_CONCURRENCY', '8'))
+HEAVY_JOB_SEMAPHORE = asyncio.Semaphore(_HEAVY_CAP)
+print(f"[HeavyJobs] Per-worker concurrency cap: {_HEAVY_CAP}", file=sys.stderr)
 main_db = client[db_name]  # Main database for users/admin
 db = main_db  # Alias for backward compatibility - will be refactored for per-user DBs
 
