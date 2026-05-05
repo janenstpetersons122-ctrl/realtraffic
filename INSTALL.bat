@@ -143,6 +143,19 @@ if not defined POSTBACK_TOKEN set "POSTBACK_TOKEN=rt-pb-%RANDOM%%RANDOM%"
     echo RESEND_FROM=no-reply@realtraffic.local
     echo GOOGLE_SHEETS_SA_PATH=/app/backend/secrets/gsheets-sa.json
     echo GOOGLE_SHEETS_SA_JSON=
+    echo.
+    echo # ─── Performance tuning (16 GB host defaults; edit if needed) ───
+    echo UVICORN_WORKERS=4
+    echo MONGO_MAX_POOL_SIZE=150
+    echo MONGO_MIN_POOL_SIZE=20
+    echo MONGO_MAX_IDLE_TIME_MS=30000
+    echo HEAVY_JOB_CONCURRENCY=8
+    echo.
+    echo # ─── Sentry monitoring (optional — paste DSN to enable) ──────────
+    echo SENTRY_DSN=
+    echo SENTRY_ENVIRONMENT=production
+    echo SENTRY_RELEASE=realtraffic@latest
+    echo SENTRY_TRACES_SAMPLE_RATE=0.05
 ) > "%ROOT%\.env"
 
 echo      OK — .env saved with strong random JWT + admin password.
@@ -193,7 +206,7 @@ if errorlevel 1 (
 
 :: ─── [5/6] Start containers ───────────────────────────────────────────
 echo.
-echo  [5/6] Starting containers ^(mongo + backend + caddy + ddns^)...
+echo  [5/6] Starting containers ^(mongo + redis + backend + caddy + ddns^)...
 docker compose -p realtraffic -f docker-compose.yml --profile ddns up -d
 if errorlevel 1 (
     echo  [X] docker compose up failed.
