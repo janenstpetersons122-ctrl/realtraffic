@@ -1,0 +1,39 @@
+{
+  "summary": "Smoke regression after docker-compose / Caddyfile / INSTALL.bat overhaul (deployment-only artifacts). 50/50 backend tests GREEN — 15 new iter_5 smoke (every endpoint listed in review_request) + 17 iter_4 rebrand suite + 18 iter_3 clone-smoke suite. Confirmed: backend Python/runtime untouched; /health=ok with mongo_connected=true; admin login admin@realtraffic.local/admin123 → 200 is_admin=true; wrong-password → 4xx; all admin listing endpoints (users, stats, system-check, ua-versions) → 200 with admin token; /api/branding.app_name == 'RealTraffic'; RUT engine-status & jobs listing reachable; CPI mounted (/api/cpi/offers, /api/cpi/dashboard/stats not 404); sub-users + form-filler/jobs listing reachable; user register→login→/api/auth/me round-trip works; RUT POST concurrency=20 → 400 (cap mentions 15); RUT POST fast_mode=true accepted (200 with concurrency=15+fast_mode=true echoed back, job_id issued); old creds (admin@realflow.local) correctly 401. Zero 5xx anywhere. Total wall-time 8s.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /health", "issue": "(Pre-existing from iter_3/iter_4) route is on bare `app` not `api_router` so it is not reachable via public ingress (only internal localhost:8001/health). Move under /api or add ingress rule."},
+      {"endpoint": "GET /api/cpi/offers (admin JWT)", "issue": "(Pre-existing from iter_4) Returns 401 'User not found' with admin token because admin is env-only (not in users coll) and CPI uses get_current_user_with_fresh_data. Endpoint is mounted (not 404) — works for registered+activated users. Auto-provision admin row on first admin login OR add admin guard on CPI routes."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5_docker_overhaul_regression.py",
+    "/app/backend/tests/test_rebrand_iter4.py",
+    "/app/backend/tests/test_clone_smoke_iter3.py",
+    "/app/test_reports/pytest/iter5_full_regression.xml",
+    "/app/test_reports/pytest/iter5_smoke.xml"
+  ],
+  "action_items": [
+    "(No regression — no required action) Deployment artifacts (docker-compose.yml, Caddyfile, INSTALL.bat) did not perturb backend behavior. Safe to ship.",
+    "(Optional, carried over) Move /health under /api or add ingress rule so external uptime probes work.",
+    "(Optional, carried over) Auto-provision admin user row OR add admin-bypass on CPI routes."
+  ],
+  "critical_code_review_comments": [
+    "docker-compose.yml + Caddyfile + INSTALL.bat are deployment-only and correctly do NOT introduce any backend Python imports or runtime hooks — backend behavior is byte-identical to iter_4 (50/50 regression confirms).",
+    "INSTALL.bat generates random JWT_SECRET / admin password on first run and writes to backend/.env — this is the right pattern. Verify in deployment that the generated values are persisted and not regenerated on subsequent `docker compose up` (would invalidate user sessions).",
+    "Caddy auto-Let's-Encrypt requires port 80/443 reachable from public internet — ensure DDNS-updater service runs BEFORE Caddy attempts ACME challenge on first boot, or first-cert issuance will fail. Suggest adding `depends_on: ddns-updater` with healthcheck.",
+    "server.py monolith (~12k lines) still flagged from iter_2/3/4 — unchanged here but accumulating tech debt."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5_docker_overhaul_regression.py (NEW — 15 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (50/50 across iter_5 smoke + iter_4 rebrand + iter_3 clone-smoke regression)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Admin: admin@realtraffic.local / admin123 (env-seeded). Test user (ephemeral): TEST_iter5_<ts>_<uuid>@example.com / TestPass123!.",
+  "seed_data_creation": "One ephemeral test user per pytest run (TEST_iter5_<ts>_<uuid>@example.com). iter_4 fixture also creates its own TEST_rebrand_<ts>_<uuid>@example.com user + one test link + one RUT job (background, fails harmlessly w/o chromium).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter_5 confirms zero regression from docker/INSTALL.bat overhaul. Cumulative regression suite is now 50 tests (iter_3 smoke + iter_4 rebrand + iter_5 docker-overhaul-smoke), runs in ~8s. Run all three together for any future change. Pre-existing carried-over findings: /health not under /api (ingress invisible), admin JWT can't access user-scoped routes incl. CPI. RUT cap is 15, fast_mode form field is accepted. External public URL in frontend/.env should be verified in sync with kubectl ingress URL.",
+  "rca of the issue": "No bugs to RCA — pure smoke regression. Two test fixture corrections were made during iter_5 itself: (a) /api/auth/register expects `name` not `full_name` (fixed in iter_5 test file); (b) /api/real-user-traffic/jobs requires `link_id` form field (already correctly handled by iter_4's user_bundle+link_id fixtures, so iter_5 simply delegates RUT POST validation to iter_4 suite to avoid duplication)."
+}

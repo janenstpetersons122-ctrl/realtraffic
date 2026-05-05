@@ -1,0 +1,156 @@
+# ──────────────────────────────────────────────────────────────────────
+# RealTraffic — Backend + Caddy + DDNS (frontend deployed on Vercel)
+# ──────────────────────────────────────────────────────────────────────
+# Architecture:
+#     [Vercel frontend (free)]  ─→  https://api.yourdomain.com
+#                                              │
+#                                              ▼
+#               [Caddy auto-SSL via Let's Encrypt — host :443/:80]
+#                                              │
+#                                              ▼
+#              [realtraffic-backend (FastAPI + Playwright)]
+#                                              │
+#                                              ▼
+#                          [realtraffic-mongo]
+#
+# What you get:
+#   • Free Let's Encrypt SSL on api.yourdomain.com — auto-renewed
+#   • Namecheap DDNS auto-updates DNS when Nayatel rotates your public IP
+#   • All containers `realtraffic-*` prefixed → no clash with other projects
+#   • Backend NEVER exposed to host network directly — only via Caddy
+#
+# Required env vars (INSTALL.bat will ask + write to .env on first run):
+#   BACKEND_DOMAIN       — e.g. api.realtraffic.online
+#   LE_EMAIL             — Let's Encrypt notification email
+#   NAMECHEAP_DDNS_PASS  — Namecheap DDNS password (leave blank = static IP)
+#   NAMECHEAP_DOMAIN     — e.g. realtraffic.online
+#   NAMECHEAP_HOST       — e.g. api  (subdomain part)
+#
+# Manual one-time setup AFTER `docker compose up`:
+#   1. Huawei router → forward port 80 + 443 → this PC local IP
+#   2. Namecheap → Advanced DNS → A record `api` → your public IP
+#   3. Namecheap → enable Dynamic DNS → copy password into .env
+#   4. Vercel → deploy frontend → REACT_APP_BACKEND_URL=https://api.yourdomain.com
+# ──────────────────────────────────────────────────────────────────────
+name: realtraffic
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: realtraffic-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - realtraffic-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    mem_limit: 1g
+    memswap_limit: 1g
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: realtraffic-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_URL: "mongodb://mongo:27017"
+      DB_NAME: "${DB_NAME:-realtraffic}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@realtraffic.local}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      POSTBACK_TOKEN: "${POSTBACK_TOKEN}"
+      APP_URL: "${APP_URL:-https://${BACKEND_DOMAIN}}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-https://${BACKEND_DOMAIN}}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      RESEND_FROM: "${RESEND_FROM:-no-reply@realtraffic.local}"
+      GOOGLE_SHEETS_SA_PATH: "${GOOGLE_SHEETS_SA_PATH:-/app/backend/secrets/gsheets-sa.json}"
+      GOOGLE_SHEETS_SA_JSON: "${GOOGLE_SHEETS_SA_JSON:-}"
+    expose:
+      - "8001"
+    volumes:
+      - pw-browsers:/pw-browsers
+      - uploaded-data:/app/backend/uploaded_resources
+      - rut-results:/app/backend/real_user_traffic_results
+      - ./backend/secrets:/app/backend/secrets:ro
+    networks:
+      - realtraffic-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    mem_limit: 4g
+    memswap_limit: 4g
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: realtraffic-caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      # If DDNS profile is enabled, wait briefly for the DDNS updater to
+      # push the current public IP to Namecheap before Caddy attempts
+      # the Let's Encrypt ACME challenge on first boot. Without this,
+      # cert issuance can fail for 5-15 min until DDNS has run once.
+      # `service_started` is fine — we don't need the updater to be
+      # healthy, just kicked off.
+      ddns-updater:
+        condition: service_started
+        required: false
+    ports:
+      - "80:80"     # HTTP — redirects to HTTPS + Let's Encrypt challenge
+      - "443:443"   # HTTPS — public traffic
+    environment:
+      BACKEND_DOMAIN: "${BACKEND_DOMAIN}"
+      LE_EMAIL: "${LE_EMAIL}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - realtraffic-net
+    mem_limit: 256m
+
+  ddns-updater:
+    image: qmcgaw/ddns-updater:latest
+    container_name: realtraffic-ddns
+    restart: unless-stopped
+    volumes:
+      - ./ddns-config:/updater/data
+    environment:
+      - PERIOD=5m
+      - PUBLICIP_FETCHERS=ipify
+    networks:
+      - realtraffic-net
+    mem_limit: 64m
+    profiles:
+      - ddns   # only starts when Namecheap DDNS configured (INSTALL.bat enables this)
+
+volumes:
+  mongo-data:
+    name: realtraffic-mongo-data
+  pw-browsers:
+    name: realtraffic-pw-browsers
+  uploaded-data:
+    name: realtraffic-uploaded-data
+  rut-results:
+    name: realtraffic-rut-results
+  caddy-data:
+    name: realtraffic-caddy-data
+  caddy-config:
+    name: realtraffic-caddy-config
+
+networks:
+  realtraffic-net:
+    name: realtraffic-net
+    driver: bridge

@@ -1,0 +1,41 @@
+{
+  "summary": "First post-clone backend smoke test of RealTraffic. 18 endpoints across health, auth, admin, branding, AI/notification settings, sub-users, form-filler, real-user-traffic and CPI modules — all PASS. No 5xx anywhere. Admin login (admin@realtraffic.local/admin123) returns valid JWT with is_admin=true. New user registration → login → /api/auth/me round trip works. Admin endpoints (/users, /stats, /system-check, /ua-versions) all 200. CPI module mounted correctly under /api/cpi (offers + dashboard/stats both 200 for admin). Real-user-traffic engine-status and jobs list respond 200 for fresh user. App is in 'same working position' as expected post-clone — safe baseline for user to push their own changes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /health", "issue": "Not under /api prefix so the Kubernetes ingress routes the external URL to the React frontend (returns index.html). Only reachable internally on http://localhost:8001/health. Either move it to /api/health or add an ingress rule. Internal probe confirms mongo_connected=true."},
+      {"endpoint": "GET /api/form-filler/jobs", "issue": "Returns dict {\"jobs\": [...]} while most other list endpoints return a bare JSON array (e.g. /api/sub-users, /api/cpi/offers, /api/admin/users). Inconsistent response shape — frontend has to special-case this one."},
+      {"endpoint": "POST /api/auth/register", "issue": "Pydantic field is `name`, not `full_name` as the test_credentials.md / endpoint convention might suggest. 422 if you send full_name. Worth documenting in /app/memory/test_credentials.md."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_clone_smoke_iter3.py",
+    "/app/test_reports/pytest/iter3_smoke.xml"
+  ],
+  "action_items": [
+    "(Optional, low priority) Move /health to /api/health so it's reachable through the public ingress, or add it to the ingress allowlist — useful for external uptime probes.",
+    "(Optional) Normalize /api/form-filler/jobs response shape to a bare list for consistency with the rest of the list endpoints, OR document it as a known dict shape in the API contract.",
+    "(Cosmetic) Pin bcrypt version compatible with passlib to silence the 'module bcrypt has no attribute __about__' WARNING that floods backend logs on each hash op. Auth still works — just noise."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/server.py is ~11.7k lines (line count near 11800 with /api routes mounted at line 11776 and CPI at 11793). FAR exceeds the 700-line soft limit — splitting into routers (auth, admin, uploads, real_user_traffic, form_filler, branding) is overdue for any future maintenance. This was already flagged in iteration_2 — still applies.",
+    "Health endpoint route is at line 262 of server.py and is registered on the bare `app` (not `api_router`), so it bypasses the /api prefix. This is the root cause of it not being reachable through the ingress.",
+    "passlib + bcrypt version skew warning continues to print on every password hash/verify (admin login emits 1 traceback per call). Non-blocking, but pollutes logs; pin `bcrypt<4.1` or upgrade passlib.",
+    "Code paths gracefully return 200 with empty/null payloads for users that don't have feature flags (form_filler/RUT/CPI) — good UX, no spurious 403s."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_clone_smoke_iter3.py (NEW — 18 pytest cases covering full smoke surface from review_request)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Admin: admin@realtraffic.local / admin123 (env-seeded). Test user (ephemeral, prefixed): TEST_smoke_<ts>_<uuid>@example.com / TestPass123!",
+  "seed_data_creation": "One ephemeral test user per pytest run via POST /api/auth/register. Email is prefixed TEST_smoke_<ts>_<uuid> so it's easy to clean up later. No other seed data created. No uploads, no jobs, no sub-users, no offers — pure listing-side smoke test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend smoke baseline (iter_3) is GREEN — all 18 endpoints in test_clone_smoke_iter3.py respond 200 with no 5xx. Use this file as the regression smoke suite for any future change. Endpoint shape gotchas: /api/auth/register expects `name` not `full_name`; /api/form-filler/jobs returns {\"jobs\": [...]} dict not bare list; /health is at root (use http://localhost:8001/health, not external URL). Iteration_2 deeper RUT/upload contract suite (/app/backend/tests/test_uploads_depleted_contract.py + /app/tests/test_uploads_per_row_consume.py) is still the deeper coverage — re-run those on any change to upload/consume code. Backend logs continue to emit the harmless passlib/bcrypt traceback warning on every hash op — safe to ignore.",
+  "rca of the issue": "No bugs to RCA — this was a verification run after a git clone. Everything works as expected post-clone. The 3 minor findings (/health off /api, form-filler dict shape, register field name) are pre-existing API ergonomics issues, not regressions."
+}

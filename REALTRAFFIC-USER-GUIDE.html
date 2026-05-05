@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RealTraffic — Complete User Guide</title>
+<style>
+* { box-sizing: border-box; }
+:root {
+  --bg: #09090B;
+  --card: #18181B;
+  --card-elevated: #0F0F11;
+  --border: #27272A;
+  --text: #FAFAFA;
+  --muted: #A1A1AA;
+  --primary: #3B82F6;
+  --accent: #8B5CF6;
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #FFFFFF;
+    --card: #F4F4F5;
+    --card-elevated: #FAFAFA;
+    --border: #E4E4E7;
+    --text: #09090B;
+    --muted: #52525B;
+  }
+}
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.65;
+  font-size: 16px;
+}
+.layout { display: flex; min-height: 100vh; }
+/* Sidebar TOC */
+.toc {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 24px 18px;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 16px 0 8px; }
+.toc h2:first-child { margin-top: 0; }
+.toc ol { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: block;
+  padding: 6px 10px;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 13.5px;
+  transition: background 0.15s;
+}
+.toc a:hover { background: var(--card-elevated); color: var(--primary); }
+.toc a.active { background: var(--primary); color: #FFF; }
+.toc-search {
+  width: 100%;
+  background: var(--card-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.toc-search:focus { outline: none; border-color: var(--primary); }
+/* Main content */
+.content {
+  flex: 1;
+  padding: 48px 56px 96px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+.cover {
+  text-align: center;
+  padding: 64px 24px 80px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 48px;
+}
+.cover h1 {
+  font-size: 48px;
+  margin: 0 0 12px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.cover .sub { color: var(--muted); font-size: 18px; margin: 8px 0; }
+.cover .meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-top: 32px; font-size: 13px; color: var(--muted); }
+.cover .meta a { color: var(--primary); text-decoration: none; }
+h1, h2, h3 { line-height: 1.3; }
+h1 { font-size: 32px; margin: 64px 0 16px; padding-bottom: 12px; border-bottom: 2px solid var(--primary); }
+h2 { font-size: 24px; margin: 48px 0 16px; color: var(--text); }
+h3 { font-size: 18px; margin: 32px 0 12px; color: var(--primary); }
+h4 { font-size: 16px; margin: 24px 0 8px; color: var(--accent); }
+p { margin: 12px 0; }
+code {
+  background: var(--card-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+  font-size: 13.5px;
+  color: var(--accent);
+}
+pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+pre code {
+  background: none; border: none; padding: 0; color: var(--text);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  background: var(--card);
+  border-radius: 10px;
+  overflow: hidden;
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+th {
+  background: var(--card-elevated);
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--card-elevated); }
+ul, ol { padding-left: 28px; }
+li { margin: 6px 0; }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.callout {
+  background: var(--card);
+  border-left: 4px solid var(--primary);
+  padding: 14px 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+.callout.warning { border-left-color: var(--warning); }
+.callout.danger { border-left-color: var(--danger); }
+.callout.success { border-left-color: var(--success); }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+.back-top {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 6px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.back-top:hover { background: var(--primary); color: #FFF; border-color: var(--primary); }
+.section { padding-top: 1px; }
+.qref {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #FFF;
+  padding: 32px;
+  border-radius: 16px;
+  margin: 48px 0;
+}
+.qref h2 { color: #FFF; margin: 0 0 12px; border: none; }
+.qref pre {
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  color: #FFF;
+}
+.qref pre code { color: #FFF; }
+/* Mobile */
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+  background: var(--primary);
+  color: #FFF;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .menu-toggle { display: block; }
+  .toc {
+    position: fixed;
+    top: 0;
+    left: -340px;
+    height: 100vh;
+    z-index: 90;
+    transition: left 0.25s;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+  .toc.open { left: 0; }
+  .content { padding: 64px 20px 96px; }
+  .cover h1 { font-size: 32px; }
+  .cover .sub { font-size: 15px; }
+  h1 { font-size: 24px; }
+  h2 { font-size: 20px; }
+  table { font-size: 12.5px; }
+  th, td { padding: 8px 10px; }
+}
+@media print {
+  .toc, .menu-toggle, .back-top { display: none; }
+  .content { padding: 0; max-width: 100%; }
+  body { background: #FFF; color: #000; }
+  pre, table, .callout { break-inside: avoid; }
+  h1, h2, h3 { color: #000 !important; }
+  a { color: #000; text-decoration: underline; }
+}
+.hl { color: var(--success); font-weight: 600; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: var(--primary); color: #FFF; }
+.tag.warn { background: var(--warning); }
+.tag.new { background: var(--success); }
+</style>
+</head>
+<body>
+<button class="menu-toggle" onclick="document.querySelector('.toc').classList.toggle('open')">☰</button>
+<div class="layout">
+
+<aside class="toc" id="toc">
+  <input type="text" class="toc-search" placeholder="🔍 Search sections..." oninput="filterToc(this.value)">
+  <h2>🏁 Getting Started</h2>
+  <ol>
+    <li><a href="#s1">1. RealTraffic kya hai?</a></li>
+    <li><a href="#s2">2. System Requirements</a></li>
+    <li><a href="#s3">3. First-time Setup</a></li>
+    <li><a href="#s4">4. Daily Update / Resync</a></li>
+    <li><a href="#s5">5. Stop / Start / Restart</a></li>
+  </ol>
+  <h2>🔑 Login & Access</h2>
+  <ol>
+    <li><a href="#s6">6. User Login</a></li>
+    <li><a href="#s7">7. Admin Login</a></li>
+    <li><a href="#s8">8. Forgot Password</a></li>
+    <li><a href="#s9">9. Sub-User Login</a></li>
+  </ol>
+  <h2>⚙️ Admin Panel</h2>
+  <ol>
+    <li><a href="#s10">10. Admin Panel Tour</a></li>
+    <li><a href="#s11">11. User Management</a></li>
+    <li><a href="#s12">12. Approve / Block Users</a></li>
+    <li><a href="#s13">13. Email Settings (Gmail/Resend)</a></li>
+    <li><a href="#s14">14. API Settings (AI Vision)</a></li>
+    <li><a href="#s15">15. Branding</a></li>
+    <li><a href="#s16">16. System Check</a></li>
+  </ol>
+  <h2>📤 Uploaded Things</h2>
+  <ol>
+    <li><a href="#s17">17. Overview</a></li>
+    <li><a href="#s18">18. User Agents Upload</a></li>
+    <li><a href="#s19">19. Proxies Upload</a></li>
+    <li><a href="#s20">20. Data Files (Leads)</a></li>
+    <li><a href="#s21">21. Google Sheets Live ⭐</a></li>
+    <li><a href="#s22">22. Smart Multi-Tab Picker</a></li>
+    <li><a href="#s23">23. Service Account JSON Setup</a></li>
+  </ol>
+  <h2>🔗 Links & Tracking</h2>
+  <ol>
+    <li><a href="#s24">24. Create Tracked Link</a></li>
+    <li><a href="#s25">25. Click Stats</a></li>
+    <li><a href="#s26">26. Conversions & Postbacks</a></li>
+    <li><a href="#s27">27. Postback URL Setup</a></li>
+  </ol>
+  <h2>🤖 Automation Engines</h2>
+  <ol>
+    <li><a href="#s28">28. Real User Traffic (RUT)</a></li>
+    <li><a href="#s29">29. Form Filler Engine</a></li>
+    <li><a href="#s30">30. CPI Worker (Android)</a></li>
+    <li><a href="#s31">31. AI Vision Fallback</a></li>
+  </ol>
+  <h2>🔔 Notifications</h2>
+  <ol>
+    <li><a href="#s32">32. User Notification Settings</a></li>
+    <li><a href="#s33">33. Low-Stock Email Alert</a></li>
+    <li><a href="#s34">34. Custom Notification Email</a></li>
+  </ol>
+  <h2>🎨 Personalization</h2>
+  <ol>
+    <li><a href="#s35">35. Custom Theme Picker</a></li>
+    <li><a href="#s36">36. Stat & Chart Box Colors</a></li>
+  </ol>
+  <h2>👥 Sub-Users</h2>
+  <ol>
+    <li><a href="#s37">37. Create Sub-Users</a></li>
+    <li><a href="#s38">38. Sub-User Permissions</a></li>
+    <li><a href="#s39">39. Track Sub-User Stats</a></li>
+  </ol>
+  <h2>🛠️ Maintenance</h2>
+  <ol>
+    <li><a href="#s40">40. Backup MongoDB</a></li>
+    <li><a href="#s41">41. Restore from Backup</a></li>
+    <li><a href="#s42">42. Logs</a></li>
+    <li><a href="#s43">43. Common Errors & Fixes</a></li>
+    <li><a href="#s44">44. Cloudflare Tunnel Issues</a></li>
+    <li><a href="#s45">45. Backend Not Starting</a></li>
+    <li><a href="#s46">46. Frontend Not Loading</a></li>
+  </ol>
+  <h2>🔄 Updates & Deploy</h2>
+  <ol>
+    <li><a href="#s47">47. Update Code</a></li>
+    <li><a href="#s48">48. Deploy Frontend (Vercel)</a></li>
+    <li><a href="#s49">49. Backup Before Update</a></li>
+  </ol>
+  <h2>📋 Reference</h2>
+  <ol>
+    <li><a href="#s50">50. Folder Structure</a></li>
+    <li><a href="#s51">51. All .bat Scripts</a></li>
+    <li><a href="#s52">52. Default Credentials</a></li>
+    <li><a href="#s53">53. Emergency Recovery</a></li>
+    <li><a href="#s54">54. Glossary</a></li>
+  </ol>
+</aside>
+
+<main class="content">
+  <div class="cover">
+    <h1>📘 RealTraffic</h1>
+    <div class="sub">Complete User Guide</div>
+    <div class="sub">Single book-style reference for the entire platform</div>
+    <div class="meta">
+      <span><strong>Version:</strong> 1.0 · May 2026</span>
+      <span><strong>Repo:</strong> <a href="https://github.com/lenovogen03/lenovo-realtraffic" target="_blank">lenovogen03/lenovo-realtraffic</a></span>
+      <span><strong>Production:</strong> <a href="https://realtraffic.online" target="_blank">realtraffic.online</a></span>
+    </div>
+    <p style="margin-top:32px;color:var(--muted)">
+      💡 Sidebar mein kisi bhi section pe click karen. Mobile pe top-left ☰ button se TOC kholen.<br>
+      🔍 Sidebar mein search box use karke quickly section dhoondh sakte hain.
+    </p>
+  </div>
+
+  <section class="section" id="s1"><h1>1. RealTraffic kya hai?</h1>
+  <p>RealTraffic ek <strong>multi-feature traffic & lead automation platform</strong> hai jo 4 main kaam karta hai:</p>
+  <table><thead><tr><th>Module</th><th>Kya karta hai</th></tr></thead><tbody>
+  <tr><td><strong>CPI Worker</strong></td><td>Android phones pe automatically apps install karke conversions generate karta hai</td></tr>
+  <tr><td><strong>Real User Traffic (RUT)</strong></td><td>Real browser sessions chala kar surveys/forms automatically fill karta hai</td></tr>
+  <tr><td><strong>Form Filler</strong></td><td>Custom form filling engine — koi bhi form, real user behavior simulation</td></tr>
+  <tr><td><strong>Link Tracking</strong></td><td>Branded short links, click analytics, conversion postbacks</td></tr>
+  </tbody></table>
+  <h3>Tech Stack</h3>
+  <ul>
+    <li>🐍 <strong>Backend</strong>: FastAPI + Python + Playwright + MongoDB</li>
+    <li>⚛️ <strong>Frontend</strong>: React + Tailwind (Vercel pe deploy)</li>
+    <li>🐳 <strong>Deploy</strong>: Docker Compose (Windows PC pe owner ka apna)</li>
+    <li>☁️ <strong>Public access</strong>: Cloudflare Tunnel</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s2"><h1>2. System Requirements</h1>
+  <h3>Owner ki Windows PC (production server)</h3>
+  <ul>
+    <li>Windows 10/11 (64-bit)</li>
+    <li>8 GB RAM minimum (16 GB recommended)</li>
+    <li>50 GB free disk space</li>
+    <li><strong>Docker Desktop</strong>: <a href="https://www.docker.com/products/docker-desktop/" target="_blank">Download</a></li>
+    <li><strong>Git for Windows</strong>: <a href="https://git-scm.com/download/win" target="_blank">Download</a></li>
+    <li>Stable internet for Cloudflare Tunnel</li>
+    <li>Cloudflare account (free) for tunnel setup</li>
+  </ul>
+  <h3>CPI Worker (Android phones)</h3>
+  <ul>
+    <li>USB-debugging enabled phones</li>
+    <li>USB hub (recommended for multiple phones)</li>
+    <li>ADB drivers installed</li>
+  </ul>
+  <h3>End-users ka kuch nahi chahiye</h3>
+  <ul>
+    <li>Bas browser (Chrome / Firefox / Edge)</li>
+    <li>App URL: <code>https://realtraffic.online</code> ya aapka custom domain</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s3"><h1>3. First-time Setup (One-time)</h1>
+  <p>Step-by-step (~30 min):</p>
+  <ol>
+    <li><strong>Repo clone karen</strong>:
+      <pre><code>cd F:\online
+git clone https://github.com/lenovogen03/lenovo-realtraffic.git
+cd lenovo-realtraffic</code></pre>
+    </li>
+    <li><strong><code>.env</code> file banayen</strong> <code>backend/</code> folder mein:
+      <pre><code>JWT_SECRET_KEY=your-very-long-random-secret-min-32-chars
+ADMIN_EMAIL=admin@realtraffic.local
+ADMIN_PASSWORD=YourStrongAdminPassword123
+POSTBACK_TOKEN=any-secret-token-for-postback-auth
+APP_URL=https://realtraffic.online
+PUBLIC_BASE_URL=https://api.realtraffic.online
+TUNNEL_TOKEN=your-cloudflare-tunnel-token</code></pre>
+    </li>
+    <li><strong>Cloudflare Tunnel setup</strong>:
+      <ul>
+        <li><a href="https://one.dash.cloudflare.com/" target="_blank">one.dash.cloudflare.com</a> → Networks → Tunnels → Create</li>
+        <li>Naam: <code>realtraffic-tunnel</code></li>
+        <li>Token copy karen → <code>.env</code> ke <code>TUNNEL_TOKEN</code> mein paste</li>
+        <li>Domain: <code>api.realtraffic.online → http://backend:8001</code></li>
+      </ul>
+    </li>
+    <li><strong>Service Account JSON</strong> (Google Sheets ke liye) — <a href="#s23">Section 23</a></li>
+    <li><strong>Docker Desktop chalu karen</strong></li>
+    <li><strong><code>FRESH-DEPLOY.bat</code> chalayen</strong></li>
+    <li><strong>Health check</strong>: <code>https://api.realtraffic.online/health</code></li>
+    <li><strong>Admin login</strong>: <code>https://realtraffic.online/admin</code> — <a href="#s7">Section 7</a></li>
+    <li><strong>Email settings</strong>: <a href="#s13">Section 13</a></li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s4"><h1>4. Daily Update / Resync</h1>
+  <p>Jab GitHub pe naye commits push hon, production wapas sync karne ke liye:</p>
+  <ol>
+    <li>Project folder mein jayen: <code>cd F:\online\lenovo-realtraffic</code></li>
+    <li><strong><code>REALTRAFFIC-FORCE-SYNC.bat</code></strong> chalayen (double-click)</li>
+    <li>Yeh khud kar lega: git fetch + reset + Docker rebuild + restart</li>
+  </ol>
+  <p><strong>Time</strong>: 3-5 min</p>
+  <div class="callout warning">⚠️ Backup pehle lena chahiye — <a href="#s49">Section 49</a></div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s5"><h1>5. Stop / Start / Restart Commands</h1>
+  <table><thead><tr><th>Action</th><th>Script</th><th>Manual</th></tr></thead><tbody>
+  <tr><td>Stop all</td><td><code>REALTRAFFIC-STOP.bat</code></td><td><code>docker compose down</code></td></tr>
+  <tr><td>Start all</td><td><code>REALTRAFFIC-AUTO.bat</code></td><td><code>docker compose up -d</code></td></tr>
+  <tr><td>Restart backend</td><td>—</td><td><code>docker compose restart backend</code></td></tr>
+  <tr><td>Rebuild backend</td><td><code>REALTRAFFIC-UPDATE.bat</code></td><td><code>docker compose up -d --build backend</code></td></tr>
+  <tr><td>Force fresh</td><td><code>REALTRAFFIC-FORCE-SYNC.bat</code></td><td>(See script)</td></tr>
+  <tr><td>View logs</td><td><code>REALTRAFFIC-LOGS.bat</code></td><td><code>docker compose logs -f backend</code></td></tr>
+  <tr><td>Diagnose</td><td><code>DIAGNOSE.bat</code></td><td>—</td></tr>
+  </tbody></table>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s6"><h1>6. User Login</h1>
+  <p><strong>URL</strong>: <code>https://realtraffic.online/login</code></p>
+  <ol>
+    <li>Email + password daalen</li>
+    <li>Login click karen</li>
+    <li>Admin ne jo features enable kiye hain woh sidebar mein dikhenge</li>
+  </ol>
+  <p><strong>First-time register</strong>: <code>/register</code> — status <code>pending</code> rahegi, admin approve karega</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s7"><h1>7. Admin Login</h1>
+  <p><strong>URL</strong>: <code>https://realtraffic.online/admin</code></p>
+  <ol>
+    <li>Email: <code>admin@realtraffic.local</code> (ya jo <code>ADMIN_EMAIL</code> <code>.env</code> mein hai)</li>
+    <li>Password: jo <code>ADMIN_PASSWORD</code> <code>.env</code> mein hai</li>
+    <li><strong>Sign In as Admin</strong> click karen</li>
+  </ol>
+  <div class="callout warning">⚠️ Admin password change karna ho toh <code>.env</code> edit karen aur <code>docker compose restart backend</code></div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s8"><h1>8. Forgot Password</h1>
+  <ol>
+    <li>Login page → "Forgot Password?" click karen</li>
+    <li>Email daalen → "Send Reset Link"</li>
+    <li>Email check karen — RealTraffic se 1-hour-valid reset link aayega</li>
+    <li>Link click karen → naya password set karen</li>
+  </ol>
+  <div class="callout warning">⚠️ Email feature kaam karega tab hi jab admin ne <a href="#s13">Email Settings</a> configure ki ho.</div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s9"><h1>9. Sub-User Login</h1>
+  <p>Sub-users primary user ke "junior accounts" hote hain. Same login URL <code>/login</code> use karte hain. Limited features dikhte hain. Detail: <a href="#s37">Sections 37-39</a></p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s10"><h1>10. Admin Panel Tour</h1>
+  <p><code>/admin/dashboard</code> pe 6 tabs:</p>
+  <table><thead><tr><th>Tab</th><th>Kya karta hai</th></tr></thead><tbody>
+  <tr><td><strong>User Management</strong></td><td>Saare users list, approve/block, features assign</td></tr>
+  <tr><td><strong>Sub-Users</strong></td><td>Aggregate view of all sub-users</td></tr>
+  <tr><td><strong>Branding</strong></td><td>Logo, app name, colors</td></tr>
+  <tr><td><strong>API Settings</strong></td><td>Universal AI Vision API key</td></tr>
+  <tr><td><strong>Email</strong> ⭐</td><td>Gmail/Resend setup (centralized for all users)</td></tr>
+  <tr><td><strong>System Check</strong></td><td>Health, DB, Mongo, Cloudflare status</td></tr>
+  </tbody></table>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s11"><h1>11. User Management</h1>
+  <p><strong>Filters</strong>: All / Active / Pending / Blocked + search by email/name.</p>
+  <p><strong>Per-user actions</strong>: Edit (status, features, password), Activate, Block/Unblock, Delete.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s12"><h1>12. Approve / Activate / Block Users</h1>
+  <h3>Naya user approve karna</h3>
+  <ol>
+    <li>Admin Panel → User Management → Filter "Pending"</li>
+    <li>User ke samne "Edit" (pencil icon)</li>
+    <li>Status: <code>pending → active</code></li>
+    <li>Features checkboxes select karen: RUT, Form Filler, Import Data, Links, Clicks, Conversions, CPI, Sub-Users</li>
+    <li>"Save changes"</li>
+  </ol>
+  <h3>User block karna</h3>
+  <ul>
+    <li>Edit → Status: <code>blocked</code> → Save</li>
+    <li>User login nahi kar payega; sub-users bhi block ho jayenge</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s13"><h1>13. Email Settings (Gmail / Resend)</h1>
+  <p><span class="tag">⭐ One-time setup</span> Low-stock alerts, password resets, all emails ke liye zaruri.</p>
+  <h2>Option A — Gmail (free, 5 min) — RECOMMENDED</h2>
+  <h3>Step 1: 2-Step Verification ON</h3>
+  <ol>
+    <li><a href="https://myaccount.google.com/security" target="_blank">myaccount.google.com/security</a></li>
+    <li>"2-Step Verification" → On</li>
+    <li>Phone number verify</li>
+  </ol>
+  <h3>Step 2: App Password generate</h3>
+  <ol>
+    <li><a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></li>
+    <li>App name: <code>RealTraffic</code> → Create</li>
+    <li><strong>16-character password copy karen</strong> (e.g. <code>abcd efgh ijkl mnop</code>)</li>
+  </ol>
+  <div class="callout warning">⚠️ Password sirf ek baar dikhega — turant copy karen!</div>
+  <h3>Step 3: RealTraffic Admin Panel</h3>
+  <ol>
+    <li>Admin Login → <code>/admin/dashboard</code></li>
+    <li><strong>Email</strong> tab</li>
+    <li>Provider: <strong>Gmail SMTP (recommended)</strong></li>
+    <li>Gmail address: <code>aapka@gmail.com</code></li>
+    <li>App Password: 16-char paste</li>
+    <li>Sender name: <code>RealTraffic Alerts</code></li>
+    <li>"Save email settings"</li>
+  </ol>
+  <h3>Step 4: Test</h3>
+  <ol>
+    <li>"test@youremail.com" input mein email daalen (ya blank)</li>
+    <li>"Send test email" click karen</li>
+    <li>Inbox check karen — email aana chahiye</li>
+  </ol>
+  <h2>Option B — Resend (free 3,000/month, custom domains)</h2>
+  <ol>
+    <li><a href="https://resend.com/signup" target="_blank">resend.com/signup</a> → account banayen</li>
+    <li><a href="https://resend.com/api-keys" target="_blank">resend.com/api-keys</a> → "Create API Key" → naam <code>RealTraffic</code>, permission "Sending access"</li>
+    <li>Copy <code>re_xxxxxxxx</code></li>
+    <li>(Optional) <a href="https://resend.com/domains" target="_blank">resend.com/domains</a> → domain verify</li>
+    <li>Admin Panel → Email tab → Provider: <strong>Resend</strong> → API Key + From → Save → Test</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s14"><h1>14. API Settings (AI Vision Key)</h1>
+  <h3>Free Gemini key</h3>
+  <ol>
+    <li><a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a></li>
+    <li>"Create API Key" → copy</li>
+    <li>Admin Panel → API Settings → Provider: Gemini → Key paste → Save</li>
+  </ol>
+  <h3>OpenAI key (paid)</h3>
+  <ol>
+    <li><a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> → "Create new secret key"</li>
+    <li>Copy <code>sk-...</code></li>
+    <li>Admin Panel → API Settings → Provider: OpenAI → Save</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s15"><h1>15. Branding (Logo, Colors, App Name)</h1>
+  <p>Admin Panel → Branding tab. Fields: App Name, Logo URL, Primary Color, Background, Card, Border.</p>
+  <div class="callout warning">⚠️ Aapki branding tab tak kaam karegi jab user ne "Custom" theme select nahi kiya ho. Custom theme priority leta hai (<a href="#s35">Section 35</a>).</div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s16"><h1>16. System Check</h1>
+  <p>Admin Panel → System Check tab — diagnostic page jo dikhata hai:</p>
+  <ul>
+    <li>✅ Backend health</li>
+    <li>✅ MongoDB connection</li>
+    <li>✅ AI Vision key configured</li>
+    <li>✅ Email config status</li>
+    <li>✅ Cloudflare tunnel status</li>
+    <li>✅ Disk space + active jobs</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s17"><h1>17. Uploaded Things Overview</h1>
+  <p>User Side → <strong>Uploaded Things</strong> page. 3 types of uploads:</p>
+  <table><thead><tr><th>Type</th><th>Kya hota hai</th></tr></thead><tbody>
+  <tr><td>User Agents (UAs)</td><td>Browser fingerprint strings, RUT mein har visit pe rotate hoti hain</td></tr>
+  <tr><td>Proxies</td><td>IP addresses for rotation, mostly residential</td></tr>
+  <tr><td>Data Files (Leads)</td><td>first/last/email/state/zip etc. records — surveys mein use hote hain</td></tr>
+  </tbody></table>
+  <p>2 modes: <strong>File/Text</strong> ya <strong>Google Sheet URL (live)</strong> ⭐</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s18"><h1>18. User Agents Upload</h1>
+  <ol>
+    <li>Uploaded Things → <strong>User Agents / Networks</strong> tab</li>
+    <li>"+ Add UAs"</li>
+    <li>Mode: Text/File ya Google Sheet (live)</li>
+    <li>Name: <code>iPhone-iOS17-UAs</code></li>
+    <li>Upload</li>
+  </ol>
+  <p><strong>Live mode</strong> mein consumed UAs auto-skip hote hain.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s19"><h1>19. Proxies Upload</h1>
+  <p>Same flow as UAs. Format: <code>user:pass@host:port</code> per row. <strong>Live + auto-skip</strong> ensures same IP duplicate jobs mein nahi pickta.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s20"><h1>20. Data Files Upload (Leads)</h1>
+  <p>Required columns (first row = header):</p>
+  <ul>
+    <li><code>first</code>, <code>last</code>, <code>email</code> ⭐ (zaruri), <code>state</code>, <code>zip</code>, <code>address</code>, <code>phone</code></li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s21"><h1>21. Google Sheets Live Integration ⭐</h1>
+  <p><span class="tag new">BEST FEATURE</span> Sheet hi single source of truth ban jaata hai.</p>
+  <h3>Faiday</h3>
+  <ul>
+    <li>Sheet kabhi bhi edit karen — RealTraffic auto-pickup karega</li>
+    <li>MongoDB pe load nahi padta</li>
+    <li><strong>Live row deletion</strong>: rows physically delete hote jate hain</li>
+  </ul>
+  <h3>Setup (one-time, ~2 min)</h3>
+  <ol>
+    <li>Service Account JSON → <a href="#s23">Section 23</a></li>
+    <li>Sheet share: "Anyone with link → Editor" ya SA email ko Editor</li>
+    <li>Tab pe click karke URL copy karen (with <code>#gid=...</code>)</li>
+    <li>RealTraffic → Uploaded Things → "Google Sheet URL (live)" mode → URL paste</li>
+    <li>Smart Tab Picker dropdown se tab select → "Link Google Sheet"</li>
+    <li>Verify: green <strong>"LIVE EDIT"</strong> badge dikhna chahiye</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s22"><h1>22. Smart Multi-Tab Picker</h1>
+  <p>Ek master spreadsheet, multiple tabs (e.g. <code>Proxies</code>, <code>UAs</code>, <code>Leads-CA</code>):</p>
+  <ol>
+    <li>Master spreadsheet banayen: "RealTraffic Data Hub"</li>
+    <li>Andar tabs banayen</li>
+    <li>"Anyone with link → Editor" share karen</li>
+    <li>RealTraffic mein har upload type pe same URL paste karen → dropdown se sahi tab select</li>
+  </ol>
+  <p><strong>Result</strong>: Ek spreadsheet, unlimited uploads.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s23"><h1>23. Service Account JSON Setup (one-time)</h1>
+  <h3>Step 1: Google Cloud Console</h3>
+  <ol>
+    <li><a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></li>
+    <li>Top dropdown → "New Project" → name <code>realtraffic-sheets</code> → Create</li>
+  </ol>
+  <h3>Step 2: Sheets API enable</h3>
+  <ol>
+    <li>Left menu → APIs & Services → Library</li>
+    <li>Search: "Google Sheets API" → click → "Enable"</li>
+  </ol>
+  <h3>Step 3: Service Account banayen</h3>
+  <ol>
+    <li>APIs & Services → Credentials</li>
+    <li>+ Create Credentials → Service Account</li>
+    <li>Name: <code>realtraffic-bot</code> → Create → Done</li>
+  </ol>
+  <h3>Step 4: JSON key download</h3>
+  <ol>
+    <li>Service account list mein click karen</li>
+    <li>Keys tab → Add Key → Create new key → JSON → Create</li>
+    <li>JSON file download ho jayegi</li>
+  </ol>
+  <h3>Step 5: File ko sahi jagah rakhen</h3>
+  <pre><code>F:\online\real flow\lenovo real flow\lenovo-realtraffic-main\lenovo-realtraffic-main\backend\secrets\gsheets-sa.json</code></pre>
+  <ol>
+    <li>Project folder mein <code>backend\secrets\</code> folder banayen</li>
+    <li>JSON file rename karen: <code>gsheets-sa.json</code></li>
+    <li>Folder mein paste karen</li>
+  </ol>
+  <h3>Step 6: Restart</h3>
+  <p><code>REALTRAFFIC-FORCE-SYNC.bat</code> chalayen ya <code>docker compose restart backend</code></p>
+  <p><strong>Verify</strong>: Uploaded Things mein gsheet upload karen → green "LIVE EDIT" badge.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s24"><h1>24. Create a Tracked Link</h1>
+  <ol>
+    <li>User → <strong>Links</strong> page → "+ Create Link"</li>
+    <li>Destination URL, Branded short, Network select, Macro params</li>
+    <li>Create → short link milega: <code>https://realtraffic.online/r/abc123</code></li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s25"><h1>25. Click Stats & Analytics</h1>
+  <p>User → <strong>Clicks</strong> page. Real-time stats: Total/Unique clicks, country, device, browser, time-series chart. Filters: date range, link, country, device.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s26"><h1>26. Conversions & Postbacks</h1>
+  <p>User → <strong>Conversions</strong> page. Total conversions, revenue, per-link rate, top performers.</p>
+  <p>Flow: Network conversion → RealTraffic postback URL → record + dashboard update.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s27"><h1>27. Postback URL Setup</h1>
+  <p>Aapka unique postback URL:</p>
+  <pre><code>https://api.realtraffic.online/api/postback/{your-postback-token}?click_id={click_id}&payout={payout}&status=approved</code></pre>
+  <h3>Network mein register karen</h3>
+  <ul>
+    <li><strong>AppsFlyer</strong>: Configuration → Integrated Partners → "Custom" → URL paste, macros map</li>
+    <li><strong>Adjust</strong>: Settings → Postbacks → Add → URL + AdjustIDs</li>
+    <li><strong>Branch</strong>: Webhooks → Add custom webhook → URL paste</li>
+  </ul>
+  <h3>Test</h3>
+  <pre><code>curl "https://api.realtraffic.online/api/postback/your-token?click_id=test123&payout=2.50&status=approved"</code></pre>
+  <p>Expected: <code>{"status":"ok"}</code></p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s28"><h1>28. Real User Traffic (RUT) — Survey Bot</h1>
+  <h3>Job banane ka tarika</h3>
+  <ol>
+    <li>"+ New RUT Job"</li>
+    <li>Settings: Target URL, Visits count (start with 100), Concurrency (3), UAs source, Proxies source, Data file</li>
+    <li>Survey flow: FlashRewards / RetailProductsUSA preset ya Custom JSON</li>
+    <li>Schedule (optional)</li>
+    <li>Create Job</li>
+  </ol>
+  <h3>Live Activity panel</h3>
+  <ul>
+    <li>Real-time visit status, screenshots, success/failure breakdown, conversion postback fired count</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s29"><h1>29. Form Filler Engine</h1>
+  <p>RUT ka subset, specifically forms ke liye optimized.</p>
+  <ol>
+    <li>+ New Form Filler Job</li>
+    <li>Target form URL → field mapping → submit count, concurrency, proxies, UAs</li>
+    <li>Run</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s30"><h1>30. CPI Worker (Android Phones)</h1>
+  <div class="callout warning">⚠️ Production-only feature — physical phones chahiye</div>
+  <h3>Setup</h3>
+  <ol>
+    <li>Phone USB-debugging enable karen</li>
+    <li>USB se PC mein connect karen</li>
+    <li><code>CPI-ONE-CLICK.bat</code> chalayen</li>
+  </ol>
+  <h3>Job ka flow</h3>
+  <ol>
+    <li>CPI page → "+ New CPI Campaign"</li>
+    <li>App package: <code>com.example.app</code></li>
+    <li>Install source: Play Store / APK URL</li>
+    <li>Phones select, postback configure → Run</li>
+  </ol>
+  <p>CPI worker khud install karega, 30 sec wait + open, postback fire, repeat.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s31"><h1>31. AI Vision Fallback (Gemini / OpenAI)</h1>
+  <p>Jab rule-based selector fail ho jaye, AI Vision screenshot le ke decide karta hai.</p>
+  <h3>User-side setup (per-user)</h3>
+  <ol>
+    <li>User Settings → AI Vision Fallback tab</li>
+    <li>Provider: Gemini ya OpenAI</li>
+    <li>API Key paste → Save</li>
+  </ol>
+  <h3>Server-wide (admin)</h3>
+  <p>Admin Panel → API Settings (<a href="#s14">Section 14</a>)</p>
+  <h3>Free Gemini key</h3>
+  <p><a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> — free tier 1,500/day</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s32"><h1>32. User Notifications Settings</h1>
+  <p>User → Settings → <strong>Notifications</strong> tab</p>
+  <ol>
+    <li>Notification email: blank ya alag email</li>
+    <li>Enable low-stock alerts: ON</li>
+    <li>Save</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s33"><h1>33. Low-Stock Email Alert (Auto)</h1>
+  <p><strong>Trigger</strong>: gsheet upload ≤ 10% rows baaki rah jaayen.</p>
+  <h3>Email content</h3>
+  <ul>
+    <li>Subject: "⚠ Low-stock: &lt;upload_name&gt; (X of Y rows left)"</li>
+    <li>Pretty HTML with rows-remaining counter, "Open Sheet & Refill →" button</li>
+  </ul>
+  <h3>Idempotency</h3>
+  <ul>
+    <li>Per depletion ek hi email — no spam</li>
+    <li>Sheet refill karte hi flag clear ho jata hai</li>
+  </ul>
+  <p><strong>Pre-requisite</strong>: Admin ne <a href="#s13">Email Settings</a> configure ki ho.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s34"><h1>34. Custom Notification Email</h1>
+  <p>User Settings → Notifications → Notification email field mein alag email daalen (e.g. <code>team-alerts@company.com</code>) → Save.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s35"><h1>35. Custom Theme Picker</h1>
+  <p>Top-right corner → 🎨 palette icon. 3 themes: ☀️ Day, 🌙 Night, 🎨 Custom.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s36"><h1>36. Theme — Stat & Chart Box Colors</h1>
+  <p><strong>Custom theme</strong> select karen → 7 swatches:</p>
+  <table><thead><tr><th>Swatch</th><th>Kya control karta hai</th></tr></thead><tbody>
+  <tr><td>Primary</td><td>Main buttons, links, accent borders</td></tr>
+  <tr><td>Accent</td><td>Secondary highlights</td></tr>
+  <tr><td>Background</td><td>Page bg</td></tr>
+  <tr><td>Card (stat & chart boxes)</td><td>Total Clicks, Conversions, charts ka bg</td></tr>
+  <tr><td>Card Elevated (inputs)</td><td>Input fields, dropdowns, sub-cards ka bg</td></tr>
+  <tr><td>Text</td><td>Main text color</td></tr>
+  <tr><td>Border</td><td>All borders</td></tr>
+  </tbody></table>
+  <p>Theme localStorage mein save hota hai — refresh ke baad bhi rahega.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s37"><h1>37. Create Sub-Users</h1>
+  <p>User Settings → Sub-Users tab → "+ Create Sub-User" → name, email, password, permissions select → Create.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s38"><h1>38. Sub-User Permissions</h1>
+  <p>Permissions: Links, Clicks, Conversions, RUT, Form Filler, Uploaded Things, CPI. Primary user kabhi bhi edit kar sakta hai.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s39"><h1>39. Track Sub-User Performance</h1>
+  <p>User Settings → Sub-Users → "View Stats" — sub-user ka apne clicks/conversions, aggregate primary user ke under.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s40"><h1>40. Backup MongoDB Data</h1>
+  <div class="callout warning">⚠️ Update / restart se pehle hamesha backup len</div>
+  <h3>Manual backup</h3>
+  <pre><code>docker exec realtraffic-mongo mongodump --out=/data/db/backup-2026-05-04
+docker cp realtraffic-mongo:/data/db/backup-2026-05-04 F:\realtraffic-backups\</code></pre>
+  <h3>Automated (Task Scheduler)</h3>
+  <p>Daily 3 AM mein same command run karen.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s41"><h1>41. Restore from Backup</h1>
+  <pre><code>docker cp F:\realtraffic-backups\backup-2026-05-04 realtraffic-mongo:/data/db/restore
+docker exec realtraffic-mongo mongorestore --drop /data/db/restore
+docker compose restart backend</code></pre>
+  <div class="callout danger">⚠️ <code>--drop</code> flag se existing data delete ho jayega — careful!</div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s42"><h1>42. Logs — kahan check karen</h1>
+  <table><thead><tr><th>Log</th><th>Command</th></tr></thead><tbody>
+  <tr><td>Backend</td><td><code>docker compose logs -f backend</code></td></tr>
+  <tr><td>MongoDB</td><td><code>docker compose logs -f mongo</code></td></tr>
+  <tr><td>Cloudflare</td><td><code>docker compose logs -f cloudflared</code></td></tr>
+  <tr><td>All</td><td><code>docker compose logs -f</code></td></tr>
+  </tbody></table>
+  <p>Easy: <code>REALTRAFFIC-LOGS.bat</code> double-click.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s43"><h1>43. Common Errors & Fixes</h1>
+  <table><thead><tr><th>Error</th><th>Reason</th><th>Fix</th></tr></thead><tbody>
+  <tr><td>Backend healthcheck fail</td><td>Mongo not connected</td><td><code>docker compose restart mongo backend</code></td></tr>
+  <tr><td>"Invalid credentials" admin</td><td>.env password galat ya container restart nahi hua</td><td>.env check + restart</td></tr>
+  <tr><td>CORS error in browser</td><td><code>CORS_ORIGINS</code> .env mein set nahi</td><td><code>CORS_ORIGINS=*</code> + restart</td></tr>
+  <tr><td>Cloudflare 502</td><td>Tunnel down ya backend down</td><td><code>DIAGNOSE.bat</code></td></tr>
+  <tr><td>Email not sending</td><td>Provider config galat</td><td>Admin → Email → "Send test email"</td></tr>
+  <tr><td>Gsheet "no LIVE EDIT badge"</td><td>SA JSON missing</td><td><code>backend/secrets/gsheets-sa.json</code> verify + restart</td></tr>
+  <tr><td>RUT job stuck</td><td>Playwright crash</td><td>Logs check + restart</td></tr>
+  <tr><td>Frontend "Network Error"</td><td>Backend URL galat</td><td>Vercel env <code>REACT_APP_BACKEND_URL</code> verify</td></tr>
+  </tbody></table>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s44"><h1>44. Cloudflare Tunnel Issues</h1>
+  <ol>
+    <li><a href="https://one.dash.cloudflare.com/" target="_blank">one.dash.cloudflare.com</a> → Tunnels</li>
+    <li>Status check — "Healthy" ya "Inactive"?</li>
+    <li>Inactive: <code>docker compose up -d cloudflared</code></li>
+    <li>.env <code>TUNNEL_TOKEN</code> correct?</li>
+    <li><code>FIX-TUNNEL.bat</code> chalayen — automated fix</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s45"><h1>45. Backend Not Starting</h1>
+  <pre><code>docker compose logs backend | tail -50</code></pre>
+  <ul>
+    <li>Port 8001 in use: <code>netstat -ano | findstr :8001</code> → kill PID</li>
+    <li>Mongo refused: <code>docker compose logs mongo</code></li>
+    <li>Module not found: <code>docker compose build --no-cache backend</code></li>
+    <li>.env parsing error: quotes / spaces check</li>
+  </ul>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s46"><h1>46. Frontend Not Loading</h1>
+  <ol>
+    <li><a href="https://vercel.com/dashboard" target="_blank">vercel.com/dashboard</a> → project</li>
+    <li>Deployments → latest status</li>
+    <li>Settings → Environment Variables: <code>REACT_APP_BACKEND_URL=https://api.realtraffic.online</code></li>
+    <li>Re-deploy</li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s47"><h1>47. How to Update Code</h1>
+  <ol>
+    <li>Project folder mein <code>REALTRAFFIC-FORCE-SYNC.bat</code> double-click</li>
+    <li>3-5 min wait</li>
+    <li>Verify <code>https://api.realtraffic.online/health</code></li>
+  </ol>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s48"><h1>48. Deploy Frontend to Vercel</h1>
+  <p>Frontend automatically deploy hota hai jab GitHub <code>main</code> update hoti hai.</p>
+  <p>Manual: Vercel dashboard → project → Deployments → "..." → Redeploy</p>
+  <p>Naya domain add karna ho: Settings → Domains → "Add" → <code>app.yourdomain.com</code> → DNS records configure</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s49"><h1>49. Backup Before Update</h1>
+  <p><span class="tag warn">⚠️ Hamesha</span> update se pehle backup len.</p>
+  <pre><code>docker exec realtraffic-mongo mongodump --out=/data/db/pre-update-backup</code></pre>
+  <p>Phir <code>REALTRAFFIC-FORCE-SYNC.bat</code> chalayen.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s50"><h1>50. File & Folder Structure</h1>
+  <pre><code>lenovo-realtraffic/
+├── backend/                      # FastAPI + Python backend
+│   ├── server.py                 # Main app (~11.6k lines)
+│   ├── notifications.py          # Email + low-stock alerts
+│   ├── gsheet_writer.py          # Google Sheets API helpers
+│   ├── form_filler.py            # Form filling engine
+│   ├── real_user_traffic.py      # RUT survey bot engine
+│   ├── ai_automation_generator.py # AI Vision fallback
+│   ├── secrets/                  # Service Account JSONs (gitignored)
+│   │   └── gsheets-sa.json       # ← yahan rakhna hai aapko
+│   ├── uploaded_resources/       # User XLSX uploads (volume)
+│   ├── real_user_traffic_results/# Job results (volume)
+│   ├── requirements.txt
+│   ├── .env                      # Production secrets (gitignored)
+│   └── Dockerfile
+├── frontend/                     # React app
+├── realtraffic-cpi-worker/          # Native Python CPI worker
+├── deployment/                   # Cloudflare configs
+├── memory/                       # Documentation
+├── tests/                        # Test scripts
+├── docker-compose.yml            # Production stack
+├── *.bat / *.ps1                 # Windows automation
+└── README.md</code></pre>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s51"><h1>51. All .bat Scripts Explained</h1>
+  <table><thead><tr><th>Script</th><th>Use case</th></tr></thead><tbody>
+  <tr><td><code>REALTRAFFIC-AUTO.bat</code></td><td>First-time auto setup (full pipeline)</td></tr>
+  <tr><td><code>REALTRAFFIC-FORCE-SYNC.bat</code> ⭐</td><td>Pull latest code + rebuild + restart (use after every update)</td></tr>
+  <tr><td><code>REALTRAFFIC-UPDATE.bat</code></td><td>Light update (no <code>--no-cache</code>)</td></tr>
+  <tr><td><code>REALTRAFFIC-STOP.bat</code></td><td>Stop all containers</td></tr>
+  <tr><td><code>REALTRAFFIC-LOGS.bat</code></td><td>Tail backend logs</td></tr>
+  <tr><td><code>REALTRAFFIC-DOCTOR.bat</code></td><td>Health diagnostics</td></tr>
+  <tr><td><code>REALTRAFFIC-LOGIN-FIX.bat</code></td><td>Re-seed admin if login issues</td></tr>
+  <tr><td><code>REALTRAFFIC-DEPLOY.ps1</code></td><td>PowerShell deploy (more options)</td></tr>
+  <tr><td><code>DIAGNOSE.bat</code></td><td>Network + container diagnostics</td></tr>
+  <tr><td><code>FIX-TUNNEL.bat</code></td><td>Cloudflare tunnel automated fix</td></tr>
+  <tr><td><code>FRESH-DEPLOY.bat</code></td><td>Wipe + redeploy (DANGEROUS)</td></tr>
+  <tr><td><code>CPI-ONE-CLICK.bat</code></td><td>CPI worker auto-setup</td></tr>
+  <tr><td><code>CPI-PROXY-BRIDGE-TEST.bat</code></td><td>Test phone-side proxy routing</td></tr>
+  <tr><td><code>ADMIN-CREDENTIALS-MANAGER.bat</code></td><td>Reset / rotate admin credentials</td></tr>
+  <tr><td><code>ONE-CLICK-ADMIN-RESET.bat</code></td><td>Quick admin password reset</td></tr>
+  <tr><td><code>ONE-CLICK-UPGRADE.bat</code></td><td>Major version upgrade</td></tr>
+  </tbody></table>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s52"><h1>52. Default Credentials</h1>
+  <table><thead><tr><th>Account</th><th>Default</th></tr></thead><tbody>
+  <tr><td>Admin email</td><td><code>admin@realtraffic.local</code> (in .env <code>ADMIN_EMAIL</code>)</td></tr>
+  <tr><td>Admin password</td><td>Set in .env <code>ADMIN_PASSWORD</code></td></tr>
+  <tr><td>MongoDB user</td><td>None (no auth — internal Docker network only)</td></tr>
+  <tr><td>Postback token</td><td>Set in .env <code>POSTBACK_TOKEN</code></td></tr>
+  </tbody></table>
+  <div class="callout danger">⚠️ Production mein ALL passwords change karen aur strong rakhen.</div>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s53"><h1>53. Emergency Recovery</h1>
+  <h3>Sab kuch broke ho gaya</h3>
+  <ol>
+    <li>Stop: <code>REALTRAFFIC-STOP.bat</code></li>
+    <li>Backup MongoDB volume:
+      <pre><code>docker run --rm -v realtraffic_mongo-data:/data -v F:\backups:/backup ubuntu tar czf /backup/mongo-emergency.tar.gz /data</code></pre>
+    </li>
+    <li>Fresh clone:
+      <pre><code>cd F:\online
+git clone https://github.com/lenovogen03/lenovo-realtraffic.git realtraffic-fresh
+cd realtraffic-fresh</code></pre>
+    </li>
+    <li>Configure .env + backend/secrets/gsheets-sa.json</li>
+    <li><code>FRESH-DEPLOY.bat</code></li>
+    <li>Restore Mongo (zarurat ho):
+      <pre><code>docker compose stop backend
+docker run --rm -v realtraffic-fresh_mongo-data:/data -v F:\backups:/backup ubuntu tar xzf /backup/mongo-emergency.tar.gz -C /
+docker compose start backend</code></pre>
+    </li>
+  </ol>
+  <p><strong>Worst case</strong>: Mujhe (agent) batayen, mein step-by-step recover kar dunga.</p>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="section" id="s54"><h1>54. Glossary</h1>
+  <table><thead><tr><th>Term</th><th>Meaning</th></tr></thead><tbody>
+  <tr><td>CPI</td><td>Cost Per Install — Android app installation conversions</td></tr>
+  <tr><td>RUT</td><td>Real User Traffic — Real browser-based survey/form automation</td></tr>
+  <tr><td>UA</td><td>User Agent — Browser fingerprint string</td></tr>
+  <tr><td>Proxy</td><td>IP address used for routing requests</td></tr>
+  <tr><td>Postback</td><td>Server-to-server conversion notification URL</td></tr>
+  <tr><td>Cloudflare Tunnel</td><td>Secure way to expose local Docker services</td></tr>
+  <tr><td>Service Account</td><td>Google Cloud "robot user" for automated API access</td></tr>
+  <tr><td>gid</td><td>Google Sheets tab/worksheet unique ID</td></tr>
+  <tr><td>App Password</td><td>Gmail's 16-char SMTP password</td></tr>
+  <tr><td>Sub-user</td><td>Junior account under primary user</td></tr>
+  <tr><td>Depletion</td><td>Gsheet upload rows count dropping below 10%</td></tr>
+  </tbody></table>
+  <a href="#toc" class="back-top">⬆ Top</a></section>
+
+  <section class="qref" id="quick-ref">
+    <h2>🎯 Quick Reference Card</h2>
+    <pre><code>Update code:    REALTRAFFIC-FORCE-SYNC.bat
+Stop server:    REALTRAFFIC-STOP.bat
+Start server:   REALTRAFFIC-AUTO.bat
+View logs:      REALTRAFFIC-LOGS.bat
+Health check:   https://api.realtraffic.online/health
+Admin login:    https://realtraffic.online/admin
+User login:     https://realtraffic.online/login
+Repo:           github.com/lenovogen03/lenovo-realtraffic</code></pre>
+  </section>
+
+  <section style="margin-top:64px;padding-top:32px;border-top:1px solid var(--border);text-align:center;color:var(--muted)">
+    <p><strong>End of Guide</strong></p>
+    <p>📞 <strong>Support</strong>: <a href="https://github.com/lenovogen03/lenovo-realtraffic/issues" target="_blank">GitHub Issues</a></p>
+    <p>👤 <strong>Owner</strong>: lenovogen03</p>
+    <p>📅 <strong>Last updated</strong>: May 2026</p>
+  </section>
+</main>
+</div>
+
+<script>
+// Highlight active section on scroll
+const sections = document.querySelectorAll('section[id]');
+const tocLinks = document.querySelectorAll('.toc a');
+function setActive() {
+  let current = '';
+  sections.forEach(sec => {
+    const top = sec.getBoundingClientRect().top;
+    if (top < 120) current = sec.id;
+  });
+  tocLinks.forEach(link => {
+    link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', setActive, { passive: true });
+setActive();
+
+// Close mobile menu on link click
+tocLinks.forEach(link => link.addEventListener('click', () => {
+  if (window.innerWidth <= 900) document.querySelector('.toc').classList.remove('open');
+}));
+
+// Search
+function filterToc(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('.toc li').forEach(li => {
+    const text = li.textContent.toLowerCase();
+    li.style.display = !q || text.includes(q) ? '' : 'none';
+  });
+  document.querySelectorAll('.toc h2').forEach(h => {
+    const ol = h.nextElementSibling;
+    if (!ol) return;
+    const visible = Array.from(ol.children).some(li => li.style.display !== 'none');
+    h.style.display = !q || visible ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

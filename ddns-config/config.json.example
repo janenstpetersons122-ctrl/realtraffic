@@ -1,0 +1,11 @@
+{
+  "settings": [
+    {
+      "provider": "namecheap",
+      "domain": "REPLACE_WITH_YOUR_DOMAIN",
+      "host": "REPLACE_WITH_HOST",
+      "password": "REPLACE_WITH_NAMECHEAP_DDNS_PASSWORD",
+      "ip_version": "ipv4"
+    }
+  ]
+}

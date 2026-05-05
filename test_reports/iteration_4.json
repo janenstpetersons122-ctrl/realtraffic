@@ -1,0 +1,41 @@
+{
+  "summary": "Post-rebrand (RealFlow → RealTraffic) backend verification. 35/35 tests GREEN: 17 new rebrand-specific assertions in test_rebrand_iter4.py + 18 iter3 regression smoke in test_clone_smoke_iter3.py — zero regressions. Confirmed: (a) /health reports admin_email_configured='admin@realtraffic.local' + mongo_connected=true; (b) NEW admin creds (admin@realtraffic.local/admin123) return 200 + is_admin=true; (c) OLD admin creds (admin@realflow.local) correctly 401; (d) /api/branding.app_name == 'RealTraffic'; (e) RUT POST validation: concurrency=20 → 400 with message mentioning '1..15' cap; concurrency=15 + fast_mode=true → 200 with concurrency=15 and fast_mode=true echoed back + job_id issued; (f) CPI module still mounted under /api/cpi (offers+dashboard/stats reachable, not 404). User register → admin activate+grant features → link create → RUT POST path fully works end-to-end. No backend 5xx anywhere. Skipped actual RUT job execution per request (Playwright chromium pre-install warning is pre-existing, non-blocking).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/cpi/offers (admin JWT)", "issue": "Returns 401 'User not found' when called with admin token because admin is env-only (not in users collection) and CPI uses get_current_user_with_fresh_data which queries the users DB. Not a regression — same behavior in iter_3. Admin cannot use CPI routes. Either (a) auto-provision an admin user row on first admin login, or (b) add a separate admin guard on CPI routes."},
+      {"endpoint": "GET /health", "issue": "(Pre-existing from iter_3) route is on bare `app` not `api_router` so it bypasses /api prefix and is not reachable via public ingress. Only internal localhost:8001/health works. Move to /api/health or add ingress rule."},
+      {"endpoint": "POST /api/real-user-traffic/jobs (validation order)", "issue": "Proxy-required check fires AFTER concurrency check, BEFORE Target Mode / other validations. Currently if a user passes `use_stored_proxies=false` and `proxies=''` AND `upload_proxy_id=''` the error is 'At least one proxy required'. Good UX would be to mention the three alternatives (paste proxies / use stored / upload batch) in the 400 message."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_rebrand_iter4.py",
+    "/app/backend/tests/test_clone_smoke_iter3.py",
+    "/app/test_reports/pytest/iter4_rebrand.xml",
+    "/app/test_reports/pytest/iter4_iter3smoke_regression.xml"
+  ],
+  "action_items": [
+    "(Optional) Move /health under api_router (or add ingress rule) so external uptime probes work.",
+    "(Optional) CPI route access for admin — auto-provision admin user row OR add an admin-bypass in cpi_module's auth resolver.",
+    "(Cosmetic) Improve POST /api/real-user-traffic/jobs 'At least one proxy required' error message to list all 3 proxy sources (paste / stored / upload batch).",
+    "(Pre-existing from iter_3) Pin bcrypt<4.1 to silence the passlib '__about__' warning flooding backend logs."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~11959 lines — already flagged in iter_2 and iter_3. Rebrand touched 338 references across 50+ files cleanly, but the monolith makes future bug-surface-area huge. Split into routers (auth, admin, links, uploads, real_user_traffic, form_filler, branding, cpi-bind) should be scheduled.",
+    "Admin auth is purely env-based and never writes a corresponding row into the `users` collection. This leaks through every `get_current_user_with_fresh_data` endpoint as 401 for admin (CPI being the visible example). Either provision the admin user on startup, or make all feature-gated endpoints admin-aware.",
+    "RUT fast_mode is a good hardware-safety escape hatch — default OFF is correct for backward compat but the docstring should document it in /api/real-user-traffic/jobs OpenAPI schema (currently only in inline comment).",
+    "concurrency cap lowered from 20→15 is a BREAKING change for API clients sending 16..20. Response text correctly names the new cap; document this in CHANGELOG / release notes.",
+    "No ingress rule for /health means production uptime/liveness probes aiming at the public URL will silently 200 with the frontend HTML — false-positive green. Either /api/health or a K8s readiness probe against port 8001 internally is required."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rebrand_iter4.py (NEW — 17 pytest cases covering full rebrand surface)"
+  ],
+  "success_rate": {"backend": "100% (35/35 across new + regression suites)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Admin: admin@realtraffic.local / admin123 (env-seeded). Test user (ephemeral, prefixed): TEST_rebrand_<ts>_<uuid>@example.com / TestPass123! — admin-activated + features (links, real_user_traffic, form_filler, etc.) granted during the module fixture.",
+  "seed_data_creation": "One ephemeral test user per pytest run (TEST_rebrand_<ts>_<uuid>@example.com) with a single test link (TEST_rebrand_link) and one RUT job created by the 'concurrency=15 + fast_mode' boundary test. The RUT job will attempt to run in the background; Playwright chromium is not installed so the job will fail gracefully with a worker error — expected and non-blocking per review_request directive.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Rebrand is VERIFIED CLEAN (iter_4, 35/35 green). Regression suites: /app/backend/tests/test_clone_smoke_iter3.py (18 cases, pure listing smoke) + /app/backend/tests/test_rebrand_iter4.py (17 cases, adds RUT POST validation + old-creds-fail + branding). Both should run on every future change; together they take ~6 seconds. External public URL is https://4b5fd38f-8131-4325-a03e-1a926cacce61.preview.emergentagent.com (frontend/.env has a DIFFERENT URL realtraffic-sim.preview.emergentagent.com that 404s via ingress — confirm frontend/.env next time and sync if needed). Admin auth is env-only → admin JWT fails against any route using get_current_user_with_fresh_data (CPI). Use a registered+activated user for those. form-filler/jobs returns {jobs:[...]} dict, not bare list (unchanged quirk). RUT boundary: concurrency 1..15 inclusive, 16+ → 400. fast_mode=true accepted and echoed back in job creation response.",
+  "rca of the issue": "No bugs to RCA — rebrand verified clean. Three minor findings are all pre-existing ergonomic issues (unrelated to rebrand): admin env-only auth leaking into CPI, /health not under /api, and a less-than-helpful 'At least one proxy required' error message."
+}

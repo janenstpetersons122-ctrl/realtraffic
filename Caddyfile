@@ -1,0 +1,60 @@
+# ──────────────────────────────────────────────────────────────────────
+# Caddy config — auto-SSL reverse proxy for RealTraffic backend
+# ──────────────────────────────────────────────────────────────────────
+# Caddy automatically gets a free Let's Encrypt cert for {$BACKEND_DOMAIN}
+# and renews it forever. Zero config, zero hassle.
+#
+# Edit nothing in here — values come from ../docker-compose.yml env.
+# ──────────────────────────────────────────────────────────────────────
+
+{
+    email {$LE_EMAIL}
+    # Use Let's Encrypt production directory (default).
+    # Set to acme-staging if you want to test without rate-limiting:
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$BACKEND_DOMAIN} {
+    # Reverse-proxy everything to the backend container over the
+    # internal Docker network. Backend listens on :8001 inside.
+    reverse_proxy backend:8001 {
+        # Long-running RUT jobs / SSE / live-step polling
+        transport http {
+            read_timeout 600s
+            write_timeout 600s
+        }
+        # Pass real client IP and original host
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+    }
+
+    # Allow up to 100 MB uploads (xlsx data, proxy lists, screenshots, etc.)
+    request_body {
+        max_size 100MB
+    }
+
+    # gzip + zstd compression — smaller payloads, faster delivery
+    encode zstd gzip
+
+    # Security headers
+    header {
+        # HSTS — force HTTPS for 1 year
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Don't leak server info
+        -Server
+        # Frame protection
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Caddy's own access log → stdout (visible via `docker logs realtraffic-caddy`)
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}
