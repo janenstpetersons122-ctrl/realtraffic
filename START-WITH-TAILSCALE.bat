@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 cd /d "%~dp0"
 title RealTraffic Tailscale Funnel
@@ -10,7 +10,7 @@ echo   RealTraffic - Tailscale Funnel Setup
 echo ============================================================
 echo.
 
-REM ---- Step 1: Tailscale path check (handle PATH not refreshed after install) ----
+REM ---- Step 1: Tailscale path check ----
 set "TAILSCALE_EXE=tailscale"
 where tailscale >nul 2>nul
 if errorlevel 1 (
@@ -21,27 +21,45 @@ if errorlevel 1 (
     ) else (
         echo [X] Tailscale install nahi mila.
         echo     Install: https://tailscale.com/download/windows
-        echo     Install ke baad CMD band karke nayi CMD kholo, phir ye file chalao.
         pause
         exit /b 1
     )
 )
+echo [1/5] Tailscale found.
 
-echo [1/4] Tailscale found.
+REM ---- Step 2: Force connect (handles "Starting..." stuck state) ----
+echo [2/5] Tailscale connect kar rahe hain... (wait 10 sec)
+"%TAILSCALE_EXE%" up --reset >nul 2>nul
 
-REM ---- Step 2: Tailscale login check ----
+REM ---- Wait up to 30 seconds for Tailscale to be ready ----
+set /a tries=0
+:wait_loop
+set /a tries+=1
 "%TAILSCALE_EXE%" status >nul 2>nul
-if errorlevel 1 (
-    echo [X] Tailscale logged in nahi.
-    echo     System tray me icon par right-click - Log in - Google se sign in.
-    pause
-    exit /b 1
-)
-echo [2/4] Tailscale logged in.
+if not errorlevel 1 goto connected
+if %tries% GEQ 15 goto not_connected
+timeout /t 2 /nobreak >nul
+goto wait_loop
+
+:not_connected
+echo.
+echo [X] Tailscale connect nahi ho saka.
+echo.
+echo  Manual fix:
+echo   1. System tray me Tailscale icon par RIGHT-CLICK karo
+echo   2. "Connect" option click karo (agar dikhe)
+echo   3. Agar "Connect" nahi dikhta to "Exit" click karo,
+echo      phir Start menu se "Tailscale" search karke open karo
+echo   4. Tray icon GREEN ho jaye, phir is bat ko phir chalao
+echo.
+pause
+exit /b 1
+
+:connected
+echo [3/5] Tailscale connected.
 
 REM ---- Step 3: Get Tailscale URL ----
 set "TS_URL="
-for /f "tokens=2 delims= " %%a in ('"%TAILSCALE_EXE%" status ^| findstr /C:"Self"') do set "TS_HOST=%%a"
 for /f "delims=" %%h in ('powershell -NoProfile -Command "(& '%TAILSCALE_EXE%' status --json ^| ConvertFrom-Json).Self.DNSName -replace '\.$',''"') do set "TS_URL=%%h"
 
 if "%TS_URL%"=="" (
@@ -50,10 +68,10 @@ if "%TS_URL%"=="" (
     pause
     exit /b 1
 )
-echo [3/4] URL: https://%TS_URL%
+echo [4/5] URL: https://%TS_URL%
 
 REM ---- Step 4: Configure Funnel ----
-echo [4/4] Funnel configure...
+echo [5/5] Funnel configure...
 
 "%TAILSCALE_EXE%" funnel reset >nul 2>nul
 "%TAILSCALE_EXE%" serve reset >nul 2>nul
