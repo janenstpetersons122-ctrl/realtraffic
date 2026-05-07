@@ -27,30 +27,30 @@ if errorlevel 1 (
 )
 echo [1/5] Tailscale found.
 
-REM ---- Step 2: Force connect (handles "Starting..." stuck state) ----
-echo [2/5] Tailscale connect kar rahe hain... (wait 10 sec)
-"%TAILSCALE_EXE%" up --reset >nul 2>nul
-
-REM ---- Wait up to 30 seconds for Tailscale to be ready ----
+REM ---- Step 2: Check Tailscale connection (NO hanging tailscale up) ----
+echo [2/5] Tailscale connection check kar rahe hain...
 set /a tries=0
 :wait_loop
 set /a tries+=1
 "%TAILSCALE_EXE%" status >nul 2>nul
 if not errorlevel 1 goto connected
-if %tries% GEQ 15 goto not_connected
+if %tries% GEQ 5 goto not_connected
 timeout /t 2 /nobreak >nul
 goto wait_loop
 
 :not_connected
 echo.
-echo [X] Tailscale connect nahi ho saka.
+echo [X] Tailscale "Starting..." pe stuck hai ya connected nahi.
 echo.
-echo  Manual fix:
-echo   1. System tray me Tailscale icon par RIGHT-CLICK karo
-echo   2. "Connect" option click karo (agar dikhe)
-echo   3. Agar "Connect" nahi dikhta to "Exit" click karo,
-echo      phir Start menu se "Tailscale" search karke open karo
-echo   4. Tray icon GREEN ho jaye, phir is bat ko phir chalao
+echo  FIX (admin CMD me ye 2 commands chalao):
+echo     net stop Tailscale
+echo     net start Tailscale
+echo.
+echo  Phir:
+echo   1. Start menu se "Tailscale" search karke open karo
+echo   2. 30 sec wait karo
+echo   3. Tray icon par right-click - "Connect" dikhe to click karo
+echo   4. Phir is BAT ko dobara chalao
 echo.
 pause
 exit /b 1
