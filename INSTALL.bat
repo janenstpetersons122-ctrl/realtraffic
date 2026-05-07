@@ -290,7 +290,7 @@ echo      OK — Backend healthy.
 set /a TRIES=0
 :front_loop
 set /a TRIES+=1
-docker exec realtraffic-frontend wget --spider -q http://localhost:80/ >nul 2>&1
+docker exec realtraffic-frontend wget -qO- http://127.0.0.1/ >nul 2>&1
 if not errorlevel 1 goto health_ok
 if !TRIES! geq 60 goto health_timeout
 timeout /t 2 /nobreak >nul
