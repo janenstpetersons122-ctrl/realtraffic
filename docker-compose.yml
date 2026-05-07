@@ -137,7 +137,7 @@ services:
       dockerfile: Dockerfile
       args:
         # Same-origin relative API calls → "" means fetch("/api/...")
-        # goes to same host. Caddy routes /api/* to backend. Clean.
+        # goes to same host. Caddy / Tailscale routes /api/* to backend.
         REACT_APP_BACKEND_URL: ""
     container_name: realtraffic-frontend
     <<: *default-restart
@@ -146,11 +146,14 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    ports:
+      # Host port for Tailscale Funnel to forward to.
+      # Tailscale on Windows host points to localhost:${TUNNEL_HOST_PORT}
+      # Default 8080 — can override via .env if conflict.
+      - "${TUNNEL_HOST_PORT:-8080}:80"
     networks:
       - realtraffic-net
     healthcheck:
-      # Use wget without --spider (BusyBox wget --spider has flaky behavior
-      # on some 200-OK responses).  Just fetch / and discard output.
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 20s
       timeout: 5s
