@@ -1,19 +1,19 @@
 @echo off
 :: ══════════════════════════════════════════════════════════════════════
-::  RealTraffic — ONE-CLICK INSTALL (Windows, FULL home-PC deploy)
+::  RealTraffic — ONE-CLICK INSTALL (Windows, Auto-Port Smart Edition)
 :: ══════════════════════════════════════════════════════════════════════
-::  100% aapke PC pe — frontend + backend + DB + SSL, sab yahan.
-::  Sirf DuckDNS (free DNS pointer) bahir se — taki kahin se bhi access ho.
-::  Vercel / Cloudflare / koi bhi external service — KUCH NAHI.
+::  100% aapke PC pe — frontend + backend + DB + SSL.
+::  Bahir se sirf DuckDNS (free DNS pointer) — kuch nahi.
+::
+::  Smart auto-handling:
+::    • Agar port 80/443 free hain → wo use karega (clean URL)
+::    • Agar busy hain (purana Docker project) → AUTO 8080/8443 use karega
+::      (Router me port translation — URL phir bhi clean rahega)
+::    • SSL DNS-01 challenge se aata hai (DuckDNS API), port 80 ki
+::      zaroorat NAHI — purane projects bilkul kharab nahi honge
 ::
 ::  Aapko bas 1 cheez chahiye:
 ::    • DuckDNS account (FREE — 30 sec, GitHub se signup)
-::
-::  Yahi file:
-::    • Docker stack build + start (mongo + redis + backend + frontend + caddy)
-::    • Free SSL cert Let's Encrypt se (yourname.duckdns.org pe)
-::    • DuckDNS me public IP auto-update (har 5 min)
-::    • Final me admin password + port-forward instructions print
 :: ══════════════════════════════════════════════════════════════════════
 
 setlocal ENABLEDELAYEDEXPANSION
@@ -22,14 +22,14 @@ cd /d "%~dp0"
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
-title RealTraffic — One-Click Install (full home-PC deploy)
+title RealTraffic — One-Click Install (Auto-Port Smart)
 
 echo.
 echo  ╔══════════════════════════════════════════════════════════════╗
-echo  ║              RealTraffic — Full Home-PC Install              ║
+echo  ║         RealTraffic — One-Click Install (Smart)              ║
 echo  ║                                                              ║
-echo  ║  Frontend + Backend + DB + SSL — sab aapke PC pe             ║
-echo  ║  Bahir se sirf DuckDNS (free DNS) — aur kuch nahi            ║
+echo  ║  Auto-detects port conflicts, falls back to 8080/8443        ║
+echo  ║  Existing Docker projects pe koi farak NAHI parega           ║
 echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 
@@ -44,38 +44,41 @@ if errorlevel 1 (
 )
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo  [X] Docker Desktop CHAL NAHI RAHA. Start Menu se Docker Desktop kholo,
+    echo  [X] Docker Desktop CHAL NAHI RAHA.
+    echo      Start Menu se Docker Desktop kholo,
     echo      green "Running" indicator ka wait karo, phir is file ko chalao.
     pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('docker --version') do echo      OK — %%v
 
-:: ─── [2/7] Port 80 / 443 conflict check ──────────────────────────────
+:: ─── [2/7] Port auto-detection ────────────────────────────────────────
 echo.
-echo  [2/7] Port 80 / 443 conflict check...
-set "PORT_CONFLICT="
-for /f "tokens=*" %%a in ('netstat -ano ^| findstr /C:":80 " /C:":443 " ^| findstr "LISTENING"') do (
-    set "PORT_CONFLICT=1"
-    echo      [!] Port busy detected: %%a
+echo  [2/7] Port auto-detection ^(80/443 ya 8080/8443^)...
+
+set "HTTP_PORT=80"
+set "HTTPS_PORT=443"
+
+:: Check port 443 (most important — actual user traffic)
+netstat -ano | findstr "LISTENING" | findstr /R /C:":443 " >nul 2>&1
+if not errorlevel 1 (
+    echo      [!] Port 443 busy hai — alternative 8443 use karenge
+    set "HTTPS_PORT=8443"
 )
-if defined PORT_CONFLICT (
-    echo.
-    echo  [!!] Port 80 ya 443 pehle se kisi aur process/container me use ho raha hai.
-    echo       Agar aap ye install jari rakhenge, Caddy start nahi ho payega.
-    echo.
-    echo       Fix options:
-    echo         A) Us purane project ko stop karo
-    echo         B) `docker ps` check karo — agar koi container 80/443 bind
-    echo            kiye hai to uske alag port pe shift karo
-    echo         C) Cancel karo — apne DevOps se puch lo
-    echo.
-    set /p CONTINUE="      Continue karna hai anyway? (y/N): "
-    if /i not "!CONTINUE!"=="y" (
-        echo      Cancelled.
-        pause & exit /b 2
-    )
+
+:: Check port 80
+netstat -ano | findstr "LISTENING" | findstr /R /C:":80 " >nul 2>&1
+if not errorlevel 1 (
+    echo      [!] Port 80 busy hai — alternative 8080 use karenge
+    set "HTTP_PORT=8080"
+)
+
+if "!HTTP_PORT!!HTTPS_PORT!"=="80443" (
+    echo      OK — ports 80 + 443 free, standard ports use kar rahe hain.
 ) else (
-    echo      OK — ports 80 + 443 free.
+    echo      OK — alternative ports detect ho gaye:
+    echo            HTTP   = !HTTP_PORT!
+    echo            HTTPS  = !HTTPS_PORT!
+    echo      ^(Router me port translation karke URL phir bhi clean rahega^)
 )
 
 :: ─── [3/7] Configuration prompt (one-time) ────────────────────────────
@@ -84,6 +87,16 @@ echo  [3/7] Configuration check...
 
 if exist "%ROOT%\.env" (
     echo      .env already exists — using saved configuration.
+
+    :: Update HTTP_PORT/HTTPS_PORT in existing .env (in case ports changed)
+    powershell -NoProfile -Command "(Get-Content '%ROOT%\.env') -replace '^HTTP_PORT=.*','HTTP_PORT=!HTTP_PORT!' -replace '^HTTPS_PORT=.*','HTTPS_PORT=!HTTPS_PORT!' | Set-Content '%ROOT%\.env'"
+
+    :: Add HTTP_PORT/HTTPS_PORT if not present
+    findstr /B /C:"HTTP_PORT=" "%ROOT%\.env" >nul 2>&1
+    if errorlevel 1 echo HTTP_PORT=!HTTP_PORT!>>"%ROOT%\.env"
+    findstr /B /C:"HTTPS_PORT=" "%ROOT%\.env" >nul 2>&1
+    if errorlevel 1 echo HTTPS_PORT=!HTTPS_PORT!>>"%ROOT%\.env"
+
     goto :env_done
 )
 
@@ -94,12 +107,11 @@ echo  │                                                               │
 echo  │  Phele DuckDNS account banao ^(free, 30 sec^):                 │
 echo  │    1. https://www.duckdns.org open karo                       │
 echo  │    2. "Sign in with GitHub" click karo                        │
-echo  │    3. Top me "domain" field me apna name daalo                │
+echo  │    3. Top me "domain" field me apna unique name daalo         │
 echo  │       Example: myrealtraffic                                  │
-echo  │       ^(Aapka URL ban jayega: myrealtraffic.duckdns.org^)       │
+echo  │       ^(URL ban jayega: myrealtraffic.duckdns.org^)             │
 echo  │    4. "add domain" button press karo                          │
-echo  │    5. Top me "token" field ki jo long string dikhayi de,      │
-echo  │       use copy karke rakhein                                  │
+echo  │    5. Top me "token" wali long string copy karo               │
 echo  │                                                               │
 echo  │  Ab niche 3 cheez chahiye:                                    │
 echo  └──────────────────────────────────────────────────────────────┘
@@ -120,7 +132,7 @@ echo      OK — final URL: https://!BACKEND_DOMAIN!
 echo.
 :ask_token
 echo  Q2. DuckDNS token ^(duckdns.org page ke top par dikhayi deta hai^)
-echo      Example: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
+echo      Example: a298314a-983b-4289-a2dc-6986c67bfafd
 set "DUCKDNS_TOKEN="
 set /p DUCKDNS_TOKEN="      Token: "
 if "!DUCKDNS_TOKEN!"=="" (
@@ -165,9 +177,13 @@ if not defined POSTBACK_TOKEN set "POSTBACK_TOKEN=rt-pb-%RANDOM%%RANDOM%"
     echo PUBLIC_BASE_URL=https://!BACKEND_DOMAIN!
     echo LE_EMAIL=!LE_EMAIL!
     echo.
-    echo # DuckDNS auto-update
+    echo # DuckDNS auto-update ^& DNS-01 ACME challenge
     echo DUCKDNS_NAME=!DUCKDNS_NAME!
     echo DUCKDNS_TOKEN=!DUCKDNS_TOKEN!
+    echo.
+    echo # Auto-detected ports ^(80/443 if free, else 8080/8443^)
+    echo HTTP_PORT=!HTTP_PORT!
+    echo HTTPS_PORT=!HTTPS_PORT!
     echo.
     echo # Optional integrations
     echo RESEND_API_KEY=
@@ -175,14 +191,14 @@ if not defined POSTBACK_TOKEN set "POSTBACK_TOKEN=rt-pb-%RANDOM%%RANDOM%"
     echo GOOGLE_SHEETS_SA_PATH=/app/backend/secrets/gsheets-sa.json
     echo GOOGLE_SHEETS_SA_JSON=
     echo.
-    echo # ─── Performance tuning (16 GB host defaults; edit if needed) ───
+    echo # ─── Performance tuning ──────────────────────────────────────────
     echo UVICORN_WORKERS=4
     echo MONGO_MAX_POOL_SIZE=150
     echo MONGO_MIN_POOL_SIZE=20
     echo MONGO_MAX_IDLE_TIME_MS=30000
     echo HEAVY_JOB_CONCURRENCY=8
     echo.
-    echo # ─── Sentry monitoring (optional — paste DSN to enable) ──────────
+    echo # ─── Sentry monitoring ^(optional^) ────────────────────────────────
     echo SENTRY_DSN=
     echo SENTRY_ENVIRONMENT=production
     echo SENTRY_RELEASE=realtraffic@latest
@@ -197,12 +213,19 @@ set "ADMIN_PASS="
 set "BACKEND_DOMAIN="
 set "DUCKDNS_NAME="
 set "DUCKDNS_TOKEN="
+set "HTTP_PORT_SAVED="
+set "HTTPS_PORT_SAVED="
 for /f "usebackq tokens=1,* delims==" %%a in ("%ROOT%\.env") do (
-    if "%%a"=="ADMIN_PASSWORD" set "ADMIN_PASS=%%b"
-    if "%%a"=="BACKEND_DOMAIN" set "BACKEND_DOMAIN=%%b"
-    if "%%a"=="DUCKDNS_NAME" set "DUCKDNS_NAME=%%b"
-    if "%%a"=="DUCKDNS_TOKEN" set "DUCKDNS_TOKEN=%%b"
+    if "%%a"=="ADMIN_PASSWORD"  set "ADMIN_PASS=%%b"
+    if "%%a"=="BACKEND_DOMAIN"  set "BACKEND_DOMAIN=%%b"
+    if "%%a"=="DUCKDNS_NAME"    set "DUCKDNS_NAME=%%b"
+    if "%%a"=="DUCKDNS_TOKEN"   set "DUCKDNS_TOKEN=%%b"
+    if "%%a"=="HTTP_PORT"       set "HTTP_PORT_SAVED=%%b"
+    if "%%a"=="HTTPS_PORT"      set "HTTPS_PORT_SAVED=%%b"
 )
+
+if defined HTTP_PORT_SAVED  set "HTTP_PORT=!HTTP_PORT_SAVED!"
+if defined HTTPS_PORT_SAVED set "HTTPS_PORT=!HTTPS_PORT_SAVED!"
 
 if not exist "%ROOT%\backend\secrets" mkdir "%ROOT%\backend\secrets" >nul 2>&1
 if not exist "%ROOT%\ddns-config" mkdir "%ROOT%\ddns-config" >nul 2>&1
@@ -228,7 +251,7 @@ echo      OK — DuckDNS will keep IP synced every 5 min.
 :: ─── [5/7] Build Docker images ────────────────────────────────────────
 echo.
 echo  [5/7] Building Docker images... ^(pehli baar 10-15 min^)
-echo       ^(backend + frontend + custom Caddy — Go xcaddy compile kar raha^)
+echo       ^(backend + frontend + custom Caddy with rate-limit + DuckDNS DNS-01^)
 docker compose -p realtraffic -f docker-compose.yml build
 if errorlevel 1 (
     echo  [X] Build failed.
@@ -312,7 +335,11 @@ echo  🌍 Aapki IPs:
 echo       Public IP:  !PUBLIC_IP!
 echo       Local IP:   !LOCAL_IP!
 echo.
-echo  🎯 Aapka App URL ^(frontend + backend, same jagah^):
+echo  🚪 Caddy ports use ho rahe hain:
+echo       HTTP   = !HTTP_PORT!
+echo       HTTPS  = !HTTPS_PORT!
+echo.
+echo  🎯 Aapka App URL:
 echo       https://!BACKEND_DOMAIN!
 echo.
 echo  🔐 Admin Login:
@@ -320,26 +347,37 @@ echo       Go to:    https://!BACKEND_DOMAIN!/admin
 echo       Email:    admin@realtraffic.local
 echo       Password: !ADMIN_PASS!
 echo.
-echo       *** YE PASSWORD ABHI SAVE KARO ^(password manager ya WhatsApp self^) ***
+echo       *** YE PASSWORD ABHI SAVE KARO ^(WhatsApp self / password manager^) ***
 echo.
 echo  ╔══════════════════════════════════════════════════════════════╗
-echo  ║            ⚠️  ABHI SIRF 1 CHEEZ AUR BAAQI HAI                ║
+echo  ║          ⚠️  ABHI SIRF 1 CHEEZ AUR BAAQI HAI                 ║
 echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 echo  ┌──────────────────────────────────────────────────────────────┐
-echo  │  HUAWEI ROUTER ME PORT FORWARD ^(one-time, 5 min^)             │
+echo  │  ROUTER ME PORT FORWARD ^(one-time, 5 min^)                    │
 echo  └──────────────────────────────────────────────────────────────┘
 echo     1. Browser me kholo: http://192.168.100.1
-echo     2. Login ^(sticker pe likha hai - usually admin/admin^)
+echo     2. Login ^(router sticker pe likha — usually admin/admin^)
 echo     3. Forward Rules ^> Port Mapping ^> Add Rule:
-echo          Rule 1:  WAN port 80   → LAN IP !LOCAL_IP! port 80   TCP
-echo          Rule 2:  WAN port 443  → LAN IP !LOCAL_IP! port 443  TCP
+echo.
+if "!HTTP_PORT!!HTTPS_PORT!"=="80443" (
+    echo          Rule 1:  WAN port 80   → LAN IP !LOCAL_IP! port 80    TCP
+    echo          Rule 2:  WAN port 443  → LAN IP !LOCAL_IP! port 443   TCP
+) else (
+    echo          ⚡ NOTE: Aapke PC pe port 80/443 koi aur project use kar
+    echo             raha hai. Hum 8080/8443 pe chal rahe hain. Router me
+    echo             port translation karo — URL phir bhi clean rahega:
+    echo.
+    echo          Rule 1:  WAN port 80   → LAN IP !LOCAL_IP! port !HTTP_PORT!   TCP
+    echo          Rule 2:  WAN port 443  → LAN IP !LOCAL_IP! port !HTTPS_PORT!  TCP
+)
+echo.
 echo     4. Save aur router restart karo
-echo     5. 5-10 min wait karo ^(DuckDNS IP propagate + Caddy SSL cert issue^)
+echo     5. 5-10 min wait karo ^(DuckDNS IP propagate + Caddy SSL cert via DNS-01^)
 echo     6. Browser me kholo:  https://!BACKEND_DOMAIN!
 echo        → RealTraffic login page dikhni chahiye
 echo.
-echo  ✅ Sab complete. Aap aur aapke users kahin se bhi access kar sakte hain.
+echo  ✅ Bas. Aap aur aapke users kahin se bhi access kar sakte hain.
 echo.
 echo  🛠️  Useful commands:
 echo       docker logs -f realtraffic-backend    ^<- backend logs

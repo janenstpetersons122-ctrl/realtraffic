@@ -172,11 +172,15 @@ services:
         condition: service_started
         required: false
     ports:
-      - "80:80"     # HTTP → redirects to HTTPS + Let's Encrypt ACME challenge
-      - "443:443"   # HTTPS → public traffic
+      # HTTP_PORT/HTTPS_PORT defaults are 80/443. INSTALL.bat auto-picks
+      # alternative ports (8080/8443) if the standard ports are already
+      # in use by another Docker project on the same machine.
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     environment:
       BACKEND_DOMAIN: "${BACKEND_DOMAIN}"
       LE_EMAIL: "${LE_EMAIL}"
+      DUCKDNS_TOKEN: "${DUCKDNS_TOKEN}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

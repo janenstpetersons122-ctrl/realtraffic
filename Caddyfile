@@ -1,20 +1,29 @@
 # ──────────────────────────────────────────────────────────────────────
-# Caddy — auto-SSL reverse proxy + rate limiting
+# Caddy — auto-SSL reverse proxy + rate limiting + DNS-01 ACME
+#
+# DNS-01 ACME via DuckDNS plugin → SSL certificate get karne ke liye
+# port 80 ki zaroorat NAHI. Aapke PC pe agar port 80/443 koi aur project
+# pehle se use kar raha ho, ye stack alternative ports pe chal sakta hai
+# bina SSL toot-e — DuckDNS API se DNS record bana ke verify hota hai.
+#
 # Routes:
-#   /api/*, /health, /ws/*, /r/*, /t/*  →  backend:8001  (FastAPI)
-#   /*                                   →  frontend:80   (nginx static)
-# Built with mholt/caddy-ratelimit plugin (deployment/caddy/Dockerfile).
+#   /api/*, /health, /ws/*, /r/*, /t/*  →  backend:8001
+#   /*                                   →  frontend:80
 # ──────────────────────────────────────────────────────────────────────
 
 {
     email {$LE_EMAIL}
+
+    # DNS-01 challenge via DuckDNS — no port 80 dependency
+    acme_dns duckdns {$DUCKDNS_TOKEN}
+
     order rate_limit before basicauth
 
     servers {
         timeouts {
             read_body   60s
             read_header 10s
-            write       0          # unlimited (long SSE / RUT streams)
+            write       0
             idle        120s
         }
         max_header_size 64KB
@@ -22,7 +31,6 @@
 }
 
 {$BACKEND_DOMAIN} {
-    # ── Rate limiting ────────────────────────────────────────────────
     @auth_paths path /api/auth/login /api/auth/register /api/admin/login /api/sub-users/login
     rate_limit @auth_paths {
         zone auth_burst {
@@ -40,13 +48,10 @@
         }
     }
 
-    # ── Upload / body size ───────────────────────────────────────────
     request_body {
         max_size 100MB
     }
 
-    # ── Backend routes ───────────────────────────────────────────────
-    # /api/* , /health , /ws/* , /r/* , /t/*  go to FastAPI.
     @backend {
         path /api/* /health /ws/* /r/* /t/*
     }
@@ -71,8 +76,6 @@
         lb_try_interval 250ms
     }
 
-    # ── Frontend (everything else) ───────────────────────────────────
-    # nginx container serving the React production build.
     reverse_proxy frontend:80 {
         transport http {
             read_timeout 120s
@@ -83,10 +86,8 @@
         header_up Host {host}
     }
 
-    # ── Compression ──────────────────────────────────────────────────
     encode zstd gzip
 
-    # ── Security headers ─────────────────────────────────────────────
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         -Server
@@ -96,7 +97,6 @@
         X-XSS-Protection "1; mode=block"
     }
 
-    # ── Access log ───────────────────────────────────────────────────
     log {
         output stdout
         format console

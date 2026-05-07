@@ -289,3 +289,59 @@ New: [Browser] ─→ https://yourname.duckdns.org ─→ [PC Caddy] ─┬─�
 4. Router port-forward 80 + 443 (one-time, 5 min)
 5. Done. Access from anywhere via `https://yourname.duckdns.org`
 
+
+### Session 9 (2026-01) — Smart Auto-Port + DNS-01 ACME (Zero-Touch Deploy)
+
+**User feedback**: "Mujai itni knowledge ni hai mein bas aik command run kron mujai koi issue na ay sab kuch automatic ho or porana agr koi b project docker pr already hai wo kharab na ho khas khyal rakhna" — fully automatic, no port checks, existing Docker projects safe.
+
+**Solution implemented:**
+
+1. **`deployment/caddy/Dockerfile`** — Added `caddy-dns/duckdns` plugin (alongside existing `mholt/caddy-ratelimit`):
+   - `xcaddy build --with github.com/mholt/caddy-ratelimit --with github.com/caddy-dns/duckdns`
+   - DNS-01 ACME challenge → SSL cert ke liye port 80 dependency NAHI
+   - Existing projects port 80 use kar rahe ho to bhi SSL cert mil jayega
+
+2. **`Caddyfile`** — Switched from HTTP-01 to DNS-01 ACME:
+   - Global block: `acme_dns duckdns {$DUCKDNS_TOKEN}`
+   - Caddy DuckDNS API se directly TXT record bana ke verify karega
+   - Port 80 free ho ya na, SSL automatic mil jayega
+
+3. **`docker-compose.yml`** — Caddy ports env-driven:
+   ```yaml
+   ports:
+     - "${HTTP_PORT:-80}:80"
+     - "${HTTPS_PORT:-443}:443"
+   environment:
+     DUCKDNS_TOKEN: "${DUCKDNS_TOKEN}"   # for DNS-01 challenge
+   ```
+   - Default 80/443; INSTALL.bat overrides if busy
+
+4. **`INSTALL.bat` rewrite** — Smart auto-port detection:
+   - `netstat -ano | findstr LISTENING ":443 "` → if busy, use 8443
+   - `netstat -ano | findstr LISTENING ":80 "` → if busy, use 8080
+   - Writes `HTTP_PORT` / `HTTPS_PORT` to `.env`
+   - On re-runs, updates existing `.env` if ports changed
+   - Final summary shows different router port-forward instructions:
+     - Standard ports (80/443): `WAN 80 → LAN 80, WAN 443 → LAN 443`
+     - Alternative ports (8080/8443): `WAN 80 → LAN 8080, WAN 443 → LAN 8443` (router translates external standard ports to internal alt ports — URL stays clean)
+   - Clear messaging: "URL phir bhi clean rahega" (no port suffix needed)
+
+5. **End-user UX**:
+   - Same `https://realtraffic.duckdns.org` clean URL regardless of which ports Caddy is bound to
+   - Existing Docker projects on PC: 100% untouched (no `docker stop`, no port grab)
+   - Fully zero-knowledge required: just double-click INSTALL.bat → 3 prompts → done
+
+**Files updated:**
+- `/app/deployment/caddy/Dockerfile` (added DuckDNS plugin)
+- `/app/Caddyfile` (DNS-01 ACME via DuckDNS)
+- `/app/docker-compose.yml` (env-driven ports + DUCKDNS_TOKEN env to caddy)
+- `/app/INSTALL.bat` (auto-port detection + dynamic router instructions)
+
+**User's DuckDNS credentials** (from screenshot):
+- Domain: `realtraffic.duckdns.org`
+- Token: `a298314a-983b-4289-a2dc-6986c67bfafd`
+- Account: `us9661626@gmail.com`
+- Public IP detected: `154.192.132.67` (Nayatel direct, no CGNAT — perfect)
+
+**Next step for user**: Save to GitHub → `git pull` on PC → INSTALL.bat double-click → router port-forward.
+
