@@ -1,16 +1,19 @@
 @echo off
 :: ══════════════════════════════════════════════════════════════════════
-::  RealTraffic — ONE-CLICK INSTALL (Windows)
+::  RealTraffic — ONE-CLICK INSTALL (Windows, FULL home-PC deploy)
 :: ══════════════════════════════════════════════════════════════════════
-::  Aapko sirf 2 cheezein chahiye:
-::    1. DuckDNS account (FREE — 30 sec, GitHub se signup)
-::    2. Vercel account (FREE — 30 sec, GitHub se signup)
+::  100% aapke PC pe — frontend + backend + DB + SSL, sab yahan.
+::  Sirf DuckDNS (free DNS pointer) bahir se — taki kahin se bhi access ho.
+::  Vercel / Cloudflare / koi bhi external service — KUCH NAHI.
+::
+::  Aapko bas 1 cheez chahiye:
+::    • DuckDNS account (FREE — 30 sec, GitHub se signup)
 ::
 ::  Yahi file:
-::    • Docker stack build + start karega
-::    • Free SSL cert lega Let's Encrypt se (yourname.duckdns.org pe)
-::    • DuckDNS me public IP auto-update karega
-::    • Final me admin password + Vercel me jo URL daalna print karega
+::    • Docker stack build + start (mongo + redis + backend + frontend + caddy)
+::    • Free SSL cert Let's Encrypt se (yourname.duckdns.org pe)
+::    • DuckDNS me public IP auto-update (har 5 min)
+::    • Final me admin password + port-forward instructions print
 :: ══════════════════════════════════════════════════════════════════════
 
 setlocal ENABLEDELAYEDEXPANSION
@@ -19,19 +22,19 @@ cd /d "%~dp0"
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
-title RealTraffic — One-Click Install
+title RealTraffic — One-Click Install (full home-PC deploy)
 
 echo.
 echo  ╔══════════════════════════════════════════════════════════════╗
-echo  ║                  RealTraffic — Easy Install                  ║
+echo  ║              RealTraffic — Full Home-PC Install              ║
 echo  ║                                                              ║
-echo  ║  Frontend → Vercel ^(free .vercel.app domain^)                 ║
-echo  ║  Backend  → Aapka home PC ^(yahi script setup karega^)         ║
+echo  ║  Frontend + Backend + DB + SSL — sab aapke PC pe             ║
+echo  ║  Bahir se sirf DuckDNS (free DNS) — aur kuch nahi            ║
 echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 
-:: ─── [1/6] Docker check ───────────────────────────────────────────────
-echo  [1/6] Docker Desktop check...
+:: ─── [1/7] Docker check ───────────────────────────────────────────────
+echo  [1/7] Docker Desktop check...
 where docker >nul 2>&1
 if errorlevel 1 (
     echo  [X] Docker installed nahi hai.
@@ -47,9 +50,37 @@ if errorlevel 1 (
 )
 for /f "tokens=*" %%v in ('docker --version') do echo      OK — %%v
 
-:: ─── [2/6] Configuration prompt (one-time) ────────────────────────────
+:: ─── [2/7] Port 80 / 443 conflict check ──────────────────────────────
 echo.
-echo  [2/6] Configuration check...
+echo  [2/7] Port 80 / 443 conflict check...
+set "PORT_CONFLICT="
+for /f "tokens=*" %%a in ('netstat -ano ^| findstr /C:":80 " /C:":443 " ^| findstr "LISTENING"') do (
+    set "PORT_CONFLICT=1"
+    echo      [!] Port busy detected: %%a
+)
+if defined PORT_CONFLICT (
+    echo.
+    echo  [!!] Port 80 ya 443 pehle se kisi aur process/container me use ho raha hai.
+    echo       Agar aap ye install jari rakhenge, Caddy start nahi ho payega.
+    echo.
+    echo       Fix options:
+    echo         A) Us purane project ko stop karo
+    echo         B) `docker ps` check karo — agar koi container 80/443 bind
+    echo            kiye hai to uske alag port pe shift karo
+    echo         C) Cancel karo — apne DevOps se puch lo
+    echo.
+    set /p CONTINUE="      Continue karna hai anyway? (y/N): "
+    if /i not "!CONTINUE!"=="y" (
+        echo      Cancelled.
+        pause & exit /b 2
+    )
+) else (
+    echo      OK — ports 80 + 443 free.
+)
+
+:: ─── [3/7] Configuration prompt (one-time) ────────────────────────────
+echo.
+echo  [3/7] Configuration check...
 
 if exist "%ROOT%\.env" (
     echo      .env already exists — using saved configuration.
@@ -67,7 +98,7 @@ echo  │    3. Top me "domain" field me apna name daalo                │
 echo  │       Example: myrealtraffic                                  │
 echo  │       ^(Aapka URL ban jayega: myrealtraffic.duckdns.org^)       │
 echo  │    4. "add domain" button press karo                          │
-echo  │    5. Top me "token" field me JO long string dikhayi de,      │
+echo  │    5. Top me "token" field ki jo long string dikhayi de,      │
 echo  │       use copy karke rakhein                                  │
 echo  │                                                               │
 echo  │  Ab niche 3 cheez chahiye:                                    │
@@ -176,9 +207,9 @@ for /f "usebackq tokens=1,* delims==" %%a in ("%ROOT%\.env") do (
 if not exist "%ROOT%\backend\secrets" mkdir "%ROOT%\backend\secrets" >nul 2>&1
 if not exist "%ROOT%\ddns-config" mkdir "%ROOT%\ddns-config" >nul 2>&1
 
-:: ─── [3/6] Write DuckDNS updater config ───────────────────────────────
+:: ─── [4/7] Write DuckDNS updater config ───────────────────────────────
 echo.
-echo  [3/6] DuckDNS config likh raha hu...
+echo  [4/7] DuckDNS config likh raha hu...
 
 (
     echo {
@@ -194,49 +225,67 @@ echo  [3/6] DuckDNS config likh raha hu...
 ) > "%ROOT%\ddns-config\config.json"
 echo      OK — DuckDNS will keep IP synced every 5 min.
 
-:: ─── [4/6] Build Docker images ────────────────────────────────────────
+:: ─── [5/7] Build Docker images ────────────────────────────────────────
 echo.
-echo  [4/6] Building Docker images... ^(pehli baar 5-10 min^)
+echo  [5/7] Building Docker images... ^(pehli baar 10-15 min^)
+echo       ^(backend + frontend + custom Caddy — Go xcaddy compile kar raha^)
 docker compose -p realtraffic -f docker-compose.yml build
 if errorlevel 1 (
     echo  [X] Build failed.
-    echo      Fix: Docker Desktop ^> Settings ^> Resources ^> Memory 4GB+
+    echo      Fix: Docker Desktop ^> Settings ^> Resources ^> Memory 6GB+ ^> Apply
     pause & exit /b 1
 )
 
-:: ─── [5/6] Start containers ───────────────────────────────────────────
+:: ─── [6/7] Start containers ───────────────────────────────────────────
 echo.
-echo  [5/6] Starting containers ^(mongo + redis + backend + caddy + ddns^)...
+echo  [6/7] Starting containers ^(mongo + redis + backend + frontend + caddy + ddns^)...
 docker compose -p realtraffic -f docker-compose.yml --profile ddns up -d
 if errorlevel 1 (
     echo  [X] docker compose up failed.
     pause & exit /b 1
 )
-echo      OK — sab containers starting.
+echo      OK — sab 6 containers starting.
 
-:: ─── [6/6] Health checks ──────────────────────────────────────────────
+:: ─── [7/7] Health checks ──────────────────────────────────────────────
 echo.
-echo  [6/6] Backend ready hone ka wait kar raha hu ^(Playwright install + first SSL cert^)...
+echo  [7/7] Backend + frontend ready hone ka wait kar raha hu...
 
 set /a TRIES=0
 :health_loop
 set /a TRIES+=1
 docker exec realtraffic-backend curl --silent --max-time 3 http://localhost:8001/health >nul 2>&1
-if not errorlevel 1 goto health_ok
+if not errorlevel 1 goto health_backend_ok
 if !TRIES! geq 90 goto health_timeout
 timeout /t 2 /nobreak >nul
 echo | set /p="."
 goto health_loop
 
+:health_backend_ok
+echo.
+echo      OK — Backend healthy.
+
+set /a TRIES=0
+:front_loop
+set /a TRIES+=1
+docker exec realtraffic-frontend wget --spider -q http://localhost:80/ >nul 2>&1
+if not errorlevel 1 goto health_ok
+if !TRIES! geq 60 goto health_timeout
+timeout /t 2 /nobreak >nul
+echo | set /p="."
+goto front_loop
+
 :health_timeout
 echo.
-echo  [!] Backend ready hone me thoda aur lag raha hai.
-echo      Logs check karo: docker logs -f realtraffic-backend
+echo  [!] Kuch container ready hone me thoda aur lag raha hai.
+echo      Logs check karo:
+echo        docker logs -f realtraffic-backend
+echo        docker logs -f realtraffic-frontend
+echo        docker logs -f realtraffic-caddy
 goto detect_ip
 
 :health_ok
 echo.
-echo      OK — Backend internal health green.
+echo      OK — Frontend healthy.
 
 :detect_ip
 echo.
@@ -263,58 +312,43 @@ echo  🌍 Aapki IPs:
 echo       Public IP:  !PUBLIC_IP!
 echo       Local IP:   !LOCAL_IP!
 echo.
-echo  🎯 Backend public URL:
+echo  🎯 Aapka App URL ^(frontend + backend, same jagah^):
 echo       https://!BACKEND_DOMAIN!
 echo.
 echo  🔐 Admin Login:
+echo       Go to:    https://!BACKEND_DOMAIN!/admin
 echo       Email:    admin@realtraffic.local
 echo       Password: !ADMIN_PASS!
 echo.
+echo       *** YE PASSWORD ABHI SAVE KARO ^(password manager ya WhatsApp self^) ***
+echo.
 echo  ╔══════════════════════════════════════════════════════════════╗
-echo  ║              ⚠️  ABHI 2 CHEEZEIN BAAQI HAIN                  ║
+echo  ║            ⚠️  ABHI SIRF 1 CHEEZ AUR BAAQI HAI                ║
 echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 echo  ┌──────────────────────────────────────────────────────────────┐
-echo  │  STEP A — HUAWEI ROUTER ME PORT FORWARD                       │
+echo  │  HUAWEI ROUTER ME PORT FORWARD ^(one-time, 5 min^)             │
 echo  └──────────────────────────────────────────────────────────────┘
 echo     1. Browser me kholo: http://192.168.100.1
 echo     2. Login ^(sticker pe likha hai - usually admin/admin^)
 echo     3. Forward Rules ^> Port Mapping ^> Add Rule:
 echo          Rule 1:  WAN port 80   → LAN IP !LOCAL_IP! port 80   TCP
 echo          Rule 2:  WAN port 443  → LAN IP !LOCAL_IP! port 443  TCP
-echo     4. Save aur router restart karo.
+echo     4. Save aur router restart karo
+echo     5. 5-10 min wait karo ^(DuckDNS IP propagate + Caddy SSL cert issue^)
+echo     6. Browser me kholo:  https://!BACKEND_DOMAIN!
+echo        → RealTraffic login page dikhni chahiye
 echo.
-echo     5-10 min wait karo ^(DuckDNS IP propagate karega + Caddy SSL cert ^)
-echo     6. Test: browser me kholo https://!BACKEND_DOMAIN!/health
-echo        Aana chahiye: {"status":"ok"^}
-echo.
-echo  ┌──────────────────────────────────────────────────────────────┐
-echo  │  STEP B — VERCEL PE FRONTEND DEPLOY                          │
-echo  └──────────────────────────────────────────────────────────────┘
-echo     1. https://vercel.com/signup → "Continue with GitHub"
-echo     2. "Add New" ^> "Project" → import lenovo-realflow repo
-echo     3. Project settings:
-echo           Framework Preset:  Create React App
-echo           Root Directory:    frontend                 ^(IMPORTANT^)
-echo           Build Command:     yarn build
-echo           Output Directory:  build
-echo     4. "Environment Variables" expand karo aur ye 3 add karo:
-echo           REACT_APP_BACKEND_URL = https://!BACKEND_DOMAIN!
-echo           WDS_SOCKET_PORT       = 443
-echo           CI                    = false
-echo     5. "Deploy" press karo
-echo     6. 3-5 min me URL milega: https://lenovo-realflow.vercel.app
-echo        Wahi aapka public app hai — aap aur aapke users kahin se login!
-echo.
-echo  ✅ Sab teen steps complete hone ke baad:
-echo       Vercel URL kahin se bhi access karo. Backend yahan ghar pe chalega.
+echo  ✅ Sab complete. Aap aur aapke users kahin se bhi access kar sakte hain.
 echo.
 echo  🛠️  Useful commands:
-echo       docker logs -f realtraffic-backend   ^<- backend logs
-echo       docker logs -f realtraffic-caddy     ^<- SSL/proxy logs
-echo       docker logs -f realtraffic-ddns      ^<- DuckDNS logs
-echo       REALTRAFFIC-STOP.bat                 ^<- sab stop
-echo       REALTRAFFIC-UPDATE.bat               ^<- pull GitHub + rebuild
+echo       docker logs -f realtraffic-backend    ^<- backend logs
+echo       docker logs -f realtraffic-frontend   ^<- nginx logs
+echo       docker logs -f realtraffic-caddy      ^<- SSL/proxy logs
+echo       docker logs -f realtraffic-ddns       ^<- DuckDNS logs
+echo       REALTRAFFIC-STOP.bat                  ^<- sab stop
+echo       REALTRAFFIC-UPDATE.bat                ^<- pull GitHub + rebuild
+echo       ONE-CLICK-ADMIN-RESET.bat             ^<- admin password reset
 echo.
 pause
 endlocal

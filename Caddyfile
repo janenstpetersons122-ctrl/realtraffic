@@ -1,44 +1,28 @@
 # ──────────────────────────────────────────────────────────────────────
-# Caddy config — auto-SSL reverse proxy + rate limiting for RealTraffic
-# ──────────────────────────────────────────────────────────────────────
-# Caddy automatically gets a free Let's Encrypt cert for {$BACKEND_DOMAIN}
-# and renews it forever.  Rate limiting via mholt/caddy-ratelimit module
-# (built into our custom Caddy image at deployment/caddy/Dockerfile).
-#
-# Edit nothing in here — values come from ../docker-compose.yml env.
+# Caddy — auto-SSL reverse proxy + rate limiting
+# Routes:
+#   /api/*, /health, /ws/*, /r/*, /t/*  →  backend:8001  (FastAPI)
+#   /*                                   →  frontend:80   (nginx static)
+# Built with mholt/caddy-ratelimit plugin (deployment/caddy/Dockerfile).
 # ──────────────────────────────────────────────────────────────────────
 
 {
     email {$LE_EMAIL}
-    # Use Let's Encrypt production directory (default).
-    # For testing without rate-limiting hits, switch to:
-    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
-
-    # Order rate_limit BEFORE reverse_proxy so it short-circuits abuse
-    # before any backend work happens.
     order rate_limit before basicauth
 
-    # Server-wide hardening
     servers {
-        # Drop slow-loris clients
         timeouts {
             read_body   60s
             read_header 10s
-            write       0          # 0 = unlimited (long RUT SSE/streams)
+            write       0          # unlimited (long SSE / RUT streams)
             idle        120s
         }
-        # Cap simultaneous connections per server (defense vs C10K floods)
         max_header_size 64KB
     }
 }
 
 {$BACKEND_DOMAIN} {
-    # ────────────────────────────────────────────────────────────────
-    # Rate limiting — two zones:
-    #   1. "auth_burst"  : 10 req / 10 sec per IP — login/register only
-    #   2. "global_burst": 600 req / 60 sec per IP — everything else
-    # Returns HTTP 429 when exceeded; clients should back off.
-    # ────────────────────────────────────────────────────────────────
+    # ── Rate limiting ────────────────────────────────────────────────
     @auth_paths path /api/auth/login /api/auth/register /api/admin/login /api/sub-users/login
     rate_limit @auth_paths {
         zone auth_burst {
@@ -56,61 +40,63 @@
         }
     }
 
-    # ────────────────────────────────────────────────────────────────
-    # Reverse-proxy everything to backend:8001 (internal Docker net)
-    # ────────────────────────────────────────────────────────────────
-    reverse_proxy backend:8001 {
-        # Long-running RUT jobs / SSE / live-step polling
+    # ── Upload / body size ───────────────────────────────────────────
+    request_body {
+        max_size 100MB
+    }
+
+    # ── Backend routes ───────────────────────────────────────────────
+    # /api/* , /health , /ws/* , /r/* , /t/*  go to FastAPI.
+    @backend {
+        path /api/* /health /ws/* /r/* /t/*
+    }
+    reverse_proxy @backend backend:8001 {
         transport http {
             read_timeout 600s
             write_timeout 600s
             dial_timeout 10s
             response_header_timeout 600s
         }
-
-        # Active health check — Caddy stops sending traffic if backend
-        # is unhealthy and resumes once it recovers.  Prevents 502 storms
-        # while uvicorn is restarting.
         health_uri      /health
         health_interval 15s
         health_timeout  5s
         health_status   2xx
 
-        # Pass real client IP and original host
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
         header_up Host {host}
 
-        # Retry idempotent requests once if backend is mid-restart
         lb_try_duration 5s
         lb_try_interval 250ms
     }
 
-    # Allow up to 100 MB uploads (xlsx data, proxy lists, screenshots, etc.)
-    request_body {
-        max_size 100MB
+    # ── Frontend (everything else) ───────────────────────────────────
+    # nginx container serving the React production build.
+    reverse_proxy frontend:80 {
+        transport http {
+            read_timeout 120s
+        }
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
     }
 
-    # gzip + zstd compression — smaller payloads, faster delivery
+    # ── Compression ──────────────────────────────────────────────────
     encode zstd gzip
 
-    # Security headers
+    # ── Security headers ─────────────────────────────────────────────
     header {
-        # HSTS — force HTTPS for 1 year
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        # Don't leak server info
         -Server
-        # Frame protection
         X-Frame-Options "SAMEORIGIN"
         X-Content-Type-Options "nosniff"
-        # Referrer policy
         Referrer-Policy "strict-origin-when-cross-origin"
-        # Content sniffing / XSS hardening
         X-XSS-Protection "1; mode=block"
     }
 
-    # Caddy's own access log → stdout (visible via `docker logs realtraffic-caddy`)
+    # ── Access log ───────────────────────────────────────────────────
     log {
         output stdout
         format console

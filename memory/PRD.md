@@ -241,3 +241,51 @@ docker compose up -d
 ```
 Caddy first build ~3-5 min (Go xcaddy compile). Subsequent rebuilds cached.
 
+
+### Session 8 (2026-01) — Full Home-PC Stack (Vercel REMOVED, frontend also on PC)
+
+**User decision**: NO external services except DuckDNS. Frontend bhi PC pe ho, Vercel skip. Single URL (DuckDNS) pe frontend + backend dono serve ho.
+
+**Architecture change:**
+```
+Old: [Vercel frontend] ─→ [PC backend (Caddy+FastAPI+Mongo)]
+New: [Browser] ─→ https://yourname.duckdns.org ─→ [PC Caddy] ─┬─→ frontend:80 (nginx React)
+                                                              └─→ backend:8001 (FastAPI)
+```
+
+**Files updated:**
+- `/app/docker-compose.yml`:
+  - Added `frontend` service (uses existing `frontend/Dockerfile` — multi-stage: Node build → nginx serve)
+  - Frontend build-arg `REACT_APP_BACKEND_URL=""` → same-origin relative API calls
+  - Frontend on internal network, only exposed via Caddy
+  - Caddy now `depends_on: frontend (healthy)` too
+- `/app/Caddyfile`:
+  - Path-based routing: `/api/*, /health, /ws/*, /r/*, /t/* → backend:8001`, `/* → frontend:80`
+  - Same rate-limit zones, security headers, compression
+- `/app/INSTALL.bat`:
+  - Removed all Vercel step messaging
+  - Added port 80/443 conflict detection before install (protects existing Docker projects)
+  - Updated [5/7] build, [6/7] up, [7/7] both backend AND frontend health check
+  - Final output: single URL (`https://yourname.duckdns.org`) → admin at `/admin`, users at `/login`
+  - 6 containers now (mongo + redis + backend + frontend + caddy + ddns)
+- `/app/README.md`: rewritten — full home-PC, no Vercel mention
+- `/app/DEPLOY-NOW.md`: rewritten — 4-step full deploy (DuckDNS → git pull → INSTALL.bat → router port forward)
+
+**Verified:**
+- `docker-compose.yml` YAML valid, 6 services resolved
+- Frontend `Dockerfile` + `nginx.conf` already production-ready (multi-stage build, SPA routing, /api proxy, websocket proxy, static caching)
+- `frontend/nginx.conf`'s `/api` internal proxy is effectively bypassed (Caddy routes `/api/*` directly to `backend:8001` — shorter chain, faster)
+- Frontend build arg `REACT_APP_BACKEND_URL=""` — all `${process.env.REACT_APP_BACKEND_URL}/api/...` calls become `/api/...` (relative, same-origin, no CORS, no mixed-content)
+
+**External dependencies (honestly minimal)**:
+- DuckDNS (free subdomain)
+- Let's Encrypt (free SSL)
+- That's IT. No Vercel, no Cloudflare, no domain registrar, no payment gateway, no external API.
+
+**User flow**:
+1. DuckDNS signup (30 sec, GitHub login)
+2. `git pull`
+3. `INSTALL.bat` double-click (3 prompts, ~15 min build)
+4. Router port-forward 80 + 443 (one-time, 5 min)
+5. Done. Access from anywhere via `https://yourname.duckdns.org`
+

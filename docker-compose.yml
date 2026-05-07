@@ -1,29 +1,26 @@
 # ──────────────────────────────────────────────────────────────────────
-# RealTraffic — Backend + Caddy(rate-limited) + Redis + DDNS
-# Frontend deployed on Vercel (free, free-public access from anywhere).
+# RealTraffic — FULL home-PC stack (frontend + backend + DB + SSL + DDNS)
+# 100 % on your PC. Vercel / Cloudflare / any external service — NONE.
+# Only DuckDNS (a free DNS pointer) so bahir se access ho sake.
 # ──────────────────────────────────────────────────────────────────────
 # Architecture:
-#     [Vercel frontend (free)]  ─→  https://api.yourdomain.com
-#                                              │
-#                                              ▼
-#               [Caddy auto-SSL + rate-limit  — host :443/:80]
-#                                              │
-#                                              ▼
-#              [realtraffic-backend (FastAPI 4 workers + Playwright)]
-#                                              │
-#                          ┌───────────────────┴───────────────────┐
-#                          ▼                                       ▼
-#               [realtraffic-mongo]                      [realtraffic-redis]
+#     [Browser anywhere]
+#            │ https://yourname.duckdns.org
+#            ▼
+#     [realtraffic-caddy  :80 / :443  auto-SSL + rate-limit]
+#            │
+#            ├─ /api/* , /health , /ws/* , /r/* , /t/*  →  [backend:8001]
+#            └─ /*  (everything else)                    →  [frontend:80]
+#                                                                │
+#                                                    [nginx serves React build]
 #
-# What this stack guarantees:
-#   • No timeout under heavy traffic     → Caddy 600s + backend 4 workers
-#   • Auto-SSL on api.yourdomain.com     → Let's Encrypt, auto-renewed
-#   • Auto-restart on crash              → Docker restart_policy
-#   • Rate-limit + per-IP throttling     → blocks DDoS at the edge
-#   • Healthchecks on every container    → unhealthy = no traffic
-#   • Sentry crash reporting (opt-in)    → set SENTRY_DSN in .env
-#   • Redis caching layer (used by app)  → faster repeated queries
-#   • All `realtraffic-*` prefixed       → no clash with other Docker projects
+#     [realtraffic-mongo]    [realtraffic-redis]   [realtraffic-ddns]
+#
+# Guarantees:
+#   • Single public URL: https://yourname.duckdns.org  (frontend + backend)
+#   • No CORS, no mixed-content — everything same-origin
+#   • No Vercel, no Cloudflare, no external services apart from DuckDNS
+#   • All containers `realtraffic-*` prefixed → zero clash with other projects
 # ──────────────────────────────────────────────────────────────────────
 name: realtraffic
 
@@ -33,7 +30,7 @@ x-restart-policy: &default-restart
     restart_policy:
       condition: any
       delay: 5s
-      max_attempts: 0       # unlimited — keep retrying forever
+      max_attempts: 0
       window: 60s
 
 services:
@@ -88,7 +85,6 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # ---- Core ----
       MONGO_URL: "mongodb://mongo:27017"
       DB_NAME: "${DB_NAME:-realtraffic}"
       JWT_SECRET_KEY: "${JWT_SECRET_KEY}"
@@ -98,19 +94,16 @@ services:
       APP_URL: "${APP_URL:-https://${BACKEND_DOMAIN}}"
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-https://${BACKEND_DOMAIN}}"
       CORS_ORIGINS: "${CORS_ORIGINS:-*}"
-      # ---- Performance tuning ----
       UVICORN_WORKERS: "${UVICORN_WORKERS:-4}"
       MONGO_MAX_POOL_SIZE: "${MONGO_MAX_POOL_SIZE:-150}"
       MONGO_MIN_POOL_SIZE: "${MONGO_MIN_POOL_SIZE:-20}"
       MONGO_MAX_IDLE_TIME_MS: "${MONGO_MAX_IDLE_TIME_MS:-30000}"
       HEAVY_JOB_CONCURRENCY: "${HEAVY_JOB_CONCURRENCY:-8}"
       REDIS_URL: "redis://redis:6379/0"
-      # ---- Email / Sheets ----
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       RESEND_FROM: "${RESEND_FROM:-no-reply@realtraffic.local}"
       GOOGLE_SHEETS_SA_PATH: "${GOOGLE_SHEETS_SA_PATH:-/app/backend/secrets/gsheets-sa.json}"
       GOOGLE_SHEETS_SA_JSON: "${GOOGLE_SHEETS_SA_JSON:-}"
-      # ---- Monitoring ----
       SENTRY_DSN: "${SENTRY_DSN:-}"
       SENTRY_ENVIRONMENT: "${SENTRY_ENVIRONMENT:-production}"
       SENTRY_RELEASE: "${SENTRY_RELEASE:-realtraffic@latest}"
@@ -138,6 +131,31 @@ services:
         soft: 65535
         hard: 65535
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Same-origin relative API calls → "" means fetch("/api/...")
+        # goes to same host. Caddy routes /api/* to backend. Clean.
+        REACT_APP_BACKEND_URL: ""
+    container_name: realtraffic-frontend
+    <<: *default-restart
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "80"
+    networks:
+      - realtraffic-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    mem_limit: 256m
+
   caddy:
     build:
       context: ./deployment/caddy
@@ -148,12 +166,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      frontend:
+        condition: service_healthy
       ddns-updater:
         condition: service_started
         required: false
     ports:
-      - "80:80"     # HTTP — redirects to HTTPS + Let's Encrypt challenge
-      - "443:443"   # HTTPS — public traffic
+      - "80:80"     # HTTP → redirects to HTTPS + Let's Encrypt ACME challenge
+      - "443:443"   # HTTPS → public traffic
     environment:
       BACKEND_DOMAIN: "${BACKEND_DOMAIN}"
       LE_EMAIL: "${LE_EMAIL}"
@@ -182,7 +202,7 @@ services:
       - realtraffic-net
     mem_limit: 64m
     profiles:
-      - ddns   # only starts when DDNS configured (INSTALL.bat enables this)
+      - ddns
 
 volumes:
   mongo-data:
